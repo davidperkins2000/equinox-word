@@ -2,7 +2,7 @@
 import sys, uuid
 BASE = (sys.argv[1] if len(sys.argv) > 1 else 'https://davidperkins2000.github.io/equinox-word').rstrip('/') + '/word'
 ID = '6f1c2e4a-8d3b-4e5f-9a7c-2b1d0e3f4a51'   # fixed: Word knows the add-in by this id
-VER = '1.0.1.0'
+VER = '1.0.2.0'
 m = f'''<?xml version="1.0" encoding="UTF-8"?>
 <!-- Equinox for Word (Eureka IP), feature 13.7. Sideload: copy this file to
      ~/Library/Containers/com.microsoft.Word/Data/Documents/wef/ and restart Word. -->
@@ -37,6 +37,7 @@ m = f'''<?xml version="1.0" encoding="UTF-8"?>
             <Description resid="GetStarted.Description"/>
             <LearnMoreUrl resid="Home.Url"/>
           </GetStarted>
+          <FunctionFile resid="Commands.Url"/>
           <ExtensionPoint xsi:type="PrimaryCommandSurface">
             <OfficeTab id="TabHome">
               <Group id="Eqx.Group">
@@ -65,6 +66,7 @@ m = f'''<?xml version="1.0" encoding="UTF-8"?>
       </bt:Images>
       <bt:Urls>
         <bt:Url id="Pane.Url" DefaultValue="{BASE}/taskpane.html"/>
+        <bt:Url id="Commands.Url" DefaultValue="{BASE}/commands.html"/>
         <bt:Url id="Home.Url" DefaultValue="https://eurekaip.com.au"/>
       </bt:Urls>
       <bt:ShortStrings>

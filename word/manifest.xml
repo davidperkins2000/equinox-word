@@ -7,7 +7,7 @@
            xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
            xsi:type="TaskPaneApp">
   <Id>6f1c2e4a-8d3b-4e5f-9a7c-2b1d0e3f4a51</Id>
-  <Version>1.0.1.0</Version>
+  <Version>1.0.2.0</Version>
   <ProviderName>Eureka IP</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Equinox"/>
@@ -32,6 +32,7 @@
             <Description resid="GetStarted.Description"/>
             <LearnMoreUrl resid="Home.Url"/>
           </GetStarted>
+          <FunctionFile resid="Commands.Url"/>
           <ExtensionPoint xsi:type="PrimaryCommandSurface">
             <OfficeTab id="TabHome">
               <Group id="Eqx.Group">
@@ -60,6 +61,7 @@
       </bt:Images>
       <bt:Urls>
         <bt:Url id="Pane.Url" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/taskpane.html"/>
+        <bt:Url id="Commands.Url" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/commands.html"/>
         <bt:Url id="Home.Url" DefaultValue="https://eurekaip.com.au"/>
       </bt:Urls>
       <bt:ShortStrings>
