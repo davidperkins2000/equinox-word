@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Equinox for Word</title>
+  <!-- Equinox for Word (feature 13.7): the task pane. It holds no secrets: the web app address and token
+       are typed into Settings once and kept in this Mac's Word storage. -->
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="taskpane.css">
+</head>
+<body>
+  <header>
+    <span class="brand">Equinox</span>
+    <span id="ver" class="muted"></span>
+    <button id="gear" class="icon" title="Settings" aria-label="Settings">⚙</button>
+  </header>
+
+  <section id="settings" hidden>
+    <h2>Settings</h2>
+    <label>Web app address <small>(ends in /exec)</small>
+      <input id="setUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" spellcheck="false">
+    </label>
+    <label>Token <small>(from step24_wordSetup's log)</small>
+      <span class="row"><input id="setToken" type="password" autocomplete="off" spellcheck="false">
+      <button id="showToken" class="small" type="button">Show</button></span>
+    </label>
+    <label class="check"><input id="setImg" type="checkbox"> Show the matter picture</label>
+    <div class="row"><button id="saveSettings" class="primary">Save and test</button>
+      <button id="closeSettings">Close</button></div>
+    <p id="settingsMsg" class="msg"></p>
+  </section>
+
+  <main id="main">
+    <div id="docLine" class="doc muted"></div>
+
+    <form id="codeForm" class="row">
+      <input id="codeBox" placeholder="Matter code, reference or number" autocomplete="off" spellcheck="false">
+      <button type="submit">Find</button>
+    </form>
+
+    <div id="matches" class="pills"></div>
+    <p id="msg" class="msg"></p>
+
+    <article id="matter" hidden></article>
+
+    <section id="actions" hidden>
+      <div class="act">
+        <button id="fileBtn" class="primary">File to Equinox</button>
+        <label id="fileAllWrap" class="check" hidden><input id="fileAll" type="checkbox"> Also file to <span id="fileAllN"></span></label>
+        <div id="fileOut" class="out"></div>
+      </div>
+      <div class="act">
+        <button id="sumBtn">Insert summary</button>
+        <label class="check"><input id="sumDeadline" type="checkbox" checked> Next deadline</label>
+        <label class="check"><input id="sumImage" type="checkbox"> Picture</label>
+        <div id="sumOut" class="out"></div>
+      </div>
+      <div class="act">
+        <button id="docsBtn">Open from Equinox…</button>
+        <div id="docs" hidden>
+          <input id="docFilter" placeholder="Filter documents" autocomplete="off">
+          <ul id="docList"></ul>
+        </div>
+        <div id="coOut" class="out"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="taskpane.js"></script>
+</body>
+</html>
