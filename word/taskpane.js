@@ -11,7 +11,7 @@
  * path tells the web app which matter it is. Nothing is deleted or overwritten in Equinox or Drive.
  */
 'use strict';
-const PANE_VERSION = 'w0.2.0';
+const PANE_VERSION = 'w0.2.1';
 
 const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto' };
 const store = {
@@ -259,19 +259,24 @@ async function showDocs() {
   try { const r = await call('docs', { code: state.code }); state.docs = { code: state.code, list: r.docs || [] }; renderDocs(); }
   catch (e) { $('docList').innerHTML = '<li class="bad">' + esc(e.message) + '</li>'; }
 }
+// Only documents Word can edit are offered for check-out; PDFs, images, emails and the rest stay in Equinox
+const EDITABLE = /\.(docx|docm|doc|dotx|dotm|rtf|odt)$/i;
+function editable(d) { return EDITABLE.test(d.filename || '') || (!d.filename && EDITABLE.test(d.title || '')); }
 function renderDocs() {
   const q = $('docFilter').value.trim().toLowerCase();
-  const list = state.docs.list.filter(function (d) { return !q || (d.filename + ' ' + d.title).toLowerCase().indexOf(q) >= 0; });
-  $('docList').innerHTML = list.length ? list.map(function (d) {
-    const word = /\.(docx?|dotx|rtf)$/i.test(d.filename);
+  const all = state.docs.list, words = all.filter(editable);
+  const list = words.filter(function (d) { return !q || (d.filename + ' ' + d.title).toLowerCase().indexOf(q) >= 0; });
+  const note = '<li class="muted meta">' + words.length + ' Word document' + (words.length === 1 ? '' : 's') +
+    (all.length > words.length ? ' (' + (all.length - words.length) + ' other file' + (all.length - words.length === 1 ? '' : 's') + ', such as PDFs, not shown)' : '') + '</li>';
+  $('docList').innerHTML = note + (list.length ? list.map(function (d) {
     return '<li data-id="' + esc(d.id) + '"><div class="fn">' + esc(d.filename || d.title) + '</div><div class="meta">' +
-      [esc(d.date), size(d.size), word ? '' : 'not a Word file'].filter(Boolean).join(' · ') + '</div></li>';
-  }).join('') : '<li class="muted">No documents' + (q ? ' match' : '') + '.</li>';
+      [esc(d.date), size(d.size)].filter(Boolean).join(' · ') + '</div></li>';
+  }).join('') : '<li class="muted">No Word documents' + (q ? ' match' : '') + '.</li>');
 }
 
 async function checkout(id) {
   const d = (state.docs.list || []).filter(function (x) { return String(x.id) === String(id); })[0];
-  if (!d) return;
+  if (!d || !editable(d)) return;
   const out = $('coOut');
   $('docs').hidden = true;
   out.innerHTML = '<div class="muted">Saving ' + esc(d.filename || d.title) + ' to the matter\'s Drive folder…</div>';
