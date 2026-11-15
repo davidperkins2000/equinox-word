@@ -2,7 +2,7 @@
 import sys, uuid
 BASE = (sys.argv[1] if len(sys.argv) > 1 else 'https://davidperkins2000.github.io/equinox-word').rstrip('/') + '/word'
 ID = '6f1c2e4a-8d3b-4e5f-9a7c-2b1d0e3f4a51'   # fixed: Word knows the add-in by this id
-VER = '1.0.2.0'
+VER = '1.0.3.0'
 m = f'''<?xml version="1.0" encoding="UTF-8"?>
 <!-- Equinox for Word (Eureka IP), feature 13.7. Sideload: copy this file to
      ~/Library/Containers/com.microsoft.Word/Data/Documents/wef/ and restart Word. -->
@@ -48,7 +48,7 @@ m = f'''<?xml version="1.0" encoding="UTF-8"?>
                   <Supertip><Title resid="Button.Label"/><Description resid="Button.Tip"/></Supertip>
                   <Icon><bt:Image size="16" resid="Icon.16"/><bt:Image size="32" resid="Icon.32"/><bt:Image size="80" resid="Icon.80"/></Icon>
                   <Action xsi:type="ShowTaskpane">
-                    <TaskpaneId>EquinoxPane</TaskpaneId>
+                    <TaskpaneId>Office.AutoShowTaskpaneWithDocument</TaskpaneId>
                     <SourceLocation resid="Pane.Url"/>
                   </Action>
                 </Control>

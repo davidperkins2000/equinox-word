@@ -11,9 +11,9 @@
  * path tells the web app which matter it is. Nothing is deleted or overwritten in Equinox or Drive.
  */
 'use strict';
-const PANE_VERSION = 'w0.1.0';
+const PANE_VERSION = 'w0.2.0';
 
-const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img' };
+const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto' };
 const store = {
   get: function (k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } },
   set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage blocked: kept for this session only */ } mem[k] = v; }
@@ -78,7 +78,7 @@ function docInfo() {
 
 // ---------- settings ----------
 function openSettings(why) {
-  $('setUrl').value = val(KEY.url); $('setToken').value = val(KEY.token); $('setImg').checked = val(KEY.img) === '1';
+  $('setUrl').value = val(KEY.url); $('setToken').value = val(KEY.token); $('setImg').checked = val(KEY.img) === '1'; $('setAuto').checked = autoOn();
   say($('settingsMsg'), why || '', why ? 'bad' : '');
   $('settings').hidden = false; $('main').hidden = true;
 }
@@ -87,7 +87,7 @@ async function saveSettings() {
   const url = $('setUrl').value.trim(), token = $('setToken').value.trim();
   if (!/^https:\/\/script\.google\.com\/.+\/exec\/?$/.test(url)) { say($('settingsMsg'), 'The address should start https://script.google.com/ and end in /exec.', 'bad'); return; }
   if (token.length < 32) { say($('settingsMsg'), 'That token looks too short. Copy the whole line from the log.', 'bad'); return; }
-  store.set(KEY.url, url); store.set(KEY.token, token); store.set(KEY.img, $('setImg').checked ? '1' : '');
+  store.set(KEY.url, url); store.set(KEY.token, token); store.set(KEY.img, $('setImg').checked ? '1' : ''); store.set(KEY.auto, $('setAuto').checked ? '1' : '0');
   say($('settingsMsg'), 'Testing…');
   try {
     const out = await call('ping');
@@ -123,6 +123,7 @@ function showMatches(out) {
     $('matches').innerHTML = ''; return;
   }
   say($('msg'), how);
+  if (out.how !== 'typed' && autoOn()) markAutoOpen();
   $('matches').innerHTML = state.matters.map(function (m) {
     return '<button class="pill" data-code="' + esc(m.code) + '" title="' + esc(m.title) + '">' + esc(m.code) + '</button>';
   }).join('');
@@ -164,6 +165,20 @@ function renderMatter(out) {
   if (links.length) h.push('<div class="links">' + links.join('') + '</div>');
   if (out.image && /^data:image\//.test(out.image)) h.push('<img alt="" src="' + esc(out.image) + '">');
   $('matter').innerHTML = h.join('');
+}
+
+// ---------- opening with the document ----------
+// Word for Mac can't load an add-in for every document, but a document carrying this mark opens with the pane
+// showing (the manifest's TaskpaneId is Office.AutoShowTaskpaneWithDocument). The mark is saved with the
+// document the next time it is saved; documents not in a matter are never marked.
+function autoOn() { return val(KEY.auto) !== '0'; }
+function markAutoOpen() {
+  try {
+    const st = Office.context.document.settings;
+    if (st.get('Office.AutoShowTaskpaneWithDocument') === true) return;
+    st.set('Office.AutoShowTaskpaneWithDocument', true);
+    st.saveAsync(function () {});
+  } catch (e) { /* not supported here: the pane just doesn't open by itself */ }
 }
 
 // ---------- 13.5 File to Equinox ----------
@@ -274,7 +289,7 @@ async function checkout(id) {
 // Where the checked-out file will be on this Mac, worked out from this document's own path when it sits in
 // the same Google Drive (e.g. …/Shared drives/EUREKA/<matter folder path>/<name>)
 function localPath(r) {
-  const p = state.doc.path, fp = String(r.folderPath || '');
+  const p = state.doc.path, fp = String(r.folderPath || '').split('/').map(function (x) { return x.trim(); }).filter(Boolean).join('/');
   if (!p || !fp || !/^\//.test(p)) return '';
   const i = p.toLowerCase().indexOf('/' + fp.toLowerCase().replace(/^\/+/, ''));
   if (i >= 0) return p.slice(0, i + 1 + fp.replace(/^\/+/, '').length) + '/' + r.name;

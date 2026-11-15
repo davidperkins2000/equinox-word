@@ -7,7 +7,7 @@
            xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
            xsi:type="TaskPaneApp">
   <Id>6f1c2e4a-8d3b-4e5f-9a7c-2b1d0e3f4a51</Id>
-  <Version>1.0.2.0</Version>
+  <Version>1.0.3.0</Version>
   <ProviderName>Eureka IP</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Equinox"/>
@@ -43,7 +43,7 @@
                   <Supertip><Title resid="Button.Label"/><Description resid="Button.Tip"/></Supertip>
                   <Icon><bt:Image size="16" resid="Icon.16"/><bt:Image size="32" resid="Icon.32"/><bt:Image size="80" resid="Icon.80"/></Icon>
                   <Action xsi:type="ShowTaskpane">
-                    <TaskpaneId>EquinoxPane</TaskpaneId>
+                    <TaskpaneId>Office.AutoShowTaskpaneWithDocument</TaskpaneId>
                     <SourceLocation resid="Pane.Url"/>
                   </Action>
                 </Control>
