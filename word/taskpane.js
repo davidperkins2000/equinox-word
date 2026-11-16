@@ -11,7 +11,7 @@
  * path tells the web app which matter it is. Nothing is deleted or overwritten in Equinox or Drive.
  */
 'use strict';
-const PANE_VERSION = 'w0.2.1';
+const PANE_VERSION = 'w0.2.2';
 
 const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto' };
 const store = {
@@ -151,6 +151,7 @@ function renderMatter(out) {
   h.push('<div class="code">' + esc(out.code) + '</div>');
   if (f.title) h.push('<div class="title">' + esc(f.title) + '</div>');
   if ((f.applicants || []).length) h.push('<div>' + esc(f.applicants.join('; ')) + '</div>');
+  if ((f.inventors || []).length) h.push('<div class="muted">' + esc(f.inventorLabel || 'Inventor') + (f.inventors.length > 1 ? 's' : '') + ': ' + esc(f.inventors.join('; ')) + '</div>');
   if (f.status) h.push('<div>Status: ' + esc(f.status) + '</div>');
   if (f.fatal) h.push('<div class="fatal"><b>' + esc(f.fatal.date) + '</b> : ' + esc(f.fatal.text) + '</div>');
   if (f.priority) h.push('<div>Priority ' + [linkHtml(f.priority.num), esc(f.priority.date)].filter(Boolean).join(' · ') + '</div>');
