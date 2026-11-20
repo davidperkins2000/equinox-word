@@ -8,7 +8,7 @@ word/taskpane.js     what it does (pane version in PANE_VERSION)
 word/taskpane.css    how it looks (follows the Mac's light or dark mode)
 word/assets/         icons
 word/manifest.xml    tells Word where the pane lives and adds the Equinox ribbon tab (made by make-manifest.py)
-templates/           starter letter template and its cover email, to copy into the Drive templates folder
+templates/letters/   the letter parts as kept in Drive: Master.docx, a content template, Headers/, Sign-offs/, Emails/
 make-manifest.py     writes manifest.xml for a hosting address
 ```
 
@@ -50,3 +50,17 @@ The **Equinox** tab on Word's ribbon has: Equinox (the pane), File to Equinox, N
 - The signer lines use Script Properties `LETTER_NAME`, `LETTER_TITLE` and `LETTER_PHONE` if set, else the matter's responsible user in Equinox.
 
 After this update, copy the new `word/manifest.xml` (1.0.4.0) into the `wef` folder and restart Word, so the Equinox tab appears.
+
+## Letters from parts (pane w0.4.0, script v0.0.102)
+
+Like Equinox's Smart Templates, a letter is stacked from parts in the Drive folder **Equinox letter templates**:
+
+```
+Master.docx              letterhead, page, footer and the Word styles; the letter goes where it says #EQX_LETTER#
+Headers/Letter.html      date, recipient, references, salutation, subject
+General letter.html      the content; its first lines name the parts:  <!-- master: Master -->  <!-- header: Letter -->  <!-- signoff: Letter -->
+Sign-offs/Letter.html    closing and signature
+Emails/General letter.html   the cover email for Email PDF
+```
+
+A paragraph's class is its Word style (`class="letter-subject"` → "Letter Subject"); plain `<p>` is Normal, and `<h1>`–`<h3>`, lists and `<blockquote>` use Word's built-in styles. `<strong>`, `<em>`, `<u>`, `<a href>` and `<br>` (a new line in the same style) carry across. New letter has the script fill the parts, opens the master as a new document (it opens with the Equinox pane), and the pane there writes the letter in place. Whole-document .docx templates in the folder still work.

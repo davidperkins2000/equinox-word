@@ -11,7 +11,7 @@
  * path tells the web app which matter it is. Nothing is deleted or overwritten in Equinox or Drive.
  */
 'use strict';
-const PANE_VERSION = 'w0.3.0';
+const PANE_VERSION = 'w0.4.0';
 
 const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto', pending: 'eqxw.pending' };
 const store = {
@@ -107,7 +107,7 @@ async function start() {
     const p = pendingLetter(), marked = docMatter();
     const code = (p && p.code) || marked;
     if (code) {
-      if (p) { state.recipient = p.recipient || ''; state.emailTpl = p.email || ''; if (!state.intent) state.intent = 'fill'; }
+      if (p) { state.recipient = p.recipient || ''; state.emailTpl = p.email || ''; if (!state.intent) state.intent = p.html ? 'build' : 'fill'; }
       $('docLine').textContent = p ? 'New letter for ' + code + '. Save it in the matter\'s Drive folder when you\'re ready.' : 'Unsaved document for ' + code + '.';
       showMatches({ codes: [code], matters: [{ code: code, title: '' }], how: 'typed' });
     }
@@ -367,19 +367,123 @@ async function newLetter() {
       const id = $('tplSel').value;
       if (!id) { out.innerHTML = '<div class="bad">No templates in the "Equinox letter templates" Drive folder yet.</div>'; return; }
       const t = (state.templates || []).filter(function (x) { return x.id === id; })[0] || {};
-      out.innerHTML = '<div class="muted">Opening ' + esc(t.name || 'the template') + '…</div>';
-      const r = await call('template', { id: id });
-      store.set(KEY.pending, JSON.stringify({ code: state.code, recipient: state.recipient, tpl: id, email: t.email || '', at: Date.now() }));
-      await Word.run(async function (ctx) { ctx.application.createDocument(r.base64).open(); await ctx.sync(); });
-      out.innerHTML = '<div class="good">Opened in a new window.</div><div class="muted">If its fields aren\'t filled in a moment, choose Equinox → Fill fields there.</div>';
+      out.innerHTML = '<div class="muted">Putting together ' + esc(t.name || 'the letter') + '…</div>';
+      let base64;
+      if (t.kind === 'parts') {   // master + header + content + sign-off, filled by the script
+        const r = await call('letterBuild', { code: state.code, recipient: state.recipient, id: id });
+        store.set(KEY.pending, JSON.stringify({ code: state.code, recipient: state.recipient, tpl: id, name: r.name, email: r.email || '', html: r.html, at: Date.now() }));
+        base64 = r.master;
+        if ((r.missing || []).length) out.insertAdjacentHTML('beforeend', '<div class="bad">Missing in Drive: ' + esc(r.missing.join(', ')) + '</div>');
+      } else {                    // a whole-document template: opened, then its codes filled
+        const r = await call('template', { id: id });
+        store.set(KEY.pending, JSON.stringify({ code: state.code, recipient: state.recipient, tpl: id, email: t.email || '', at: Date.now() }));
+        base64 = r.base64;
+      }
+      await Word.run(async function (ctx) { ctx.application.createDocument(base64).open(); await ctx.sync(); });
+      out.innerHTML = '<div class="good">Opened in a new window.</div><div class="muted">The Equinox pane there writes the letter. If it doesn\'t open by itself, choose Equinox → Fill fields in that window.</div>';
     } catch (e) { out.innerHTML = '<div class="bad">' + esc(e.message) + '</div>'; }
   });
 }
 
+// The letter's HTML (header, content, sign-off from letterBuild) written into this document where the master says
+// #EQX_LETTER# (else at the end), one Word paragraph per HTML paragraph or line. A paragraph's class names its Word
+// style (letter-subject → "Letter Subject"); h1–h3, list items and blockquotes use Word's built-in styles.
+const BUILT_IN = { h1: 'Heading1', h2: 'Heading2', h3: 'Heading3', ul: 'ListBullet', ol: 'ListNumber', blockquote: 'Quote' };
+function styleName(cls) {
+  const first = String(cls || '').trim().split(/\s+/)[0];
+  return first ? first.split('-').map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ') : '';
+}
+function letterBlocks(html) {
+  const root = new DOMParser().parseFromString('<div>' + html + '</div>', 'text/html').body.firstChild;
+  const blocks = [];
+  const runsOf = function (node, fmt, lines) {
+    node.childNodes.forEach(function (n) {
+      if (n.nodeType === 3) { const t = n.nodeValue.replace(/\s+/g, ' '); if (t) lines[lines.length - 1].push(Object.assign({ text: t }, fmt)); return; }
+      if (n.nodeType !== 1) return;
+      const tag = n.tagName.toLowerCase();
+      if (tag === 'br') { lines.push([]); return; }
+      const f = Object.assign({}, fmt);
+      if (tag === 'strong' || tag === 'b') f.b = true;
+      if (tag === 'em' || tag === 'i') f.i = true;
+      if (tag === 'u') f.u = true;
+      if (tag === 'a' && n.getAttribute('href')) f.href = n.getAttribute('href');
+      runsOf(n, f, lines);
+    });
+  };
+  const add = function (node, style, builtIn) {
+    const lines = [[]];
+    runsOf(node, {}, lines);
+    lines.forEach(function (runs) {
+      if (runs.length) { runs[0].text = runs[0].text.replace(/^\s+/, ''); runs[runs.length - 1].text = runs[runs.length - 1].text.replace(/\s+$/, ''); }
+      blocks.push({ style: style, builtIn: builtIn, runs: runs.filter(function (r) { return r.text; }) });
+    });
+  };
+  const walk = function (parent) {
+    parent.childNodes.forEach(function (n) {
+      if (n.nodeType === 3) { if (n.nodeValue.trim()) blocks.push({ style: '', runs: [{ text: n.nodeValue.trim() }] }); return; }
+      if (n.nodeType !== 1) return;
+      const tag = n.tagName.toLowerCase();
+      if (tag === 'ul' || tag === 'ol') { Array.prototype.forEach.call(n.children, function (li) { add(li, styleName(li.className), BUILT_IN[tag]); }); return; }
+      if (tag === 'div' || tag === 'section') { walk(n); return; }
+      add(n, styleName(n.className), n.className ? '' : (BUILT_IN[tag] || ''));
+    });
+  };
+  walk(root);
+  return blocks;
+}
+async function buildLetter() {
+  const out = $('letterOut');
+  const p = pendingLetter();
+  if (!p || !p.html) { out.innerHTML = '<div class="bad">Nothing waiting to be written: use New letter.</div>'; return; }
+  store.set(KEY.pending, JSON.stringify(Object.assign({}, p, { html: '' })));   // write it once only
+  state.emailTpl = p.email || state.emailTpl;
+  out.innerHTML = '<div class="muted">Writing the letter…</div>';
+  try {
+    const blocks = letterBlocks(p.html);
+    const unknown = await Word.run(async function (ctx) {
+      const body = ctx.document.body;
+      const hit = body.search('#EQX_LETTER#', { matchCase: true }); hit.load('items');
+      let styles = null;
+      try { if (Office.context.requirements.isSetSupported('WordApi', '1.5')) { styles = ctx.document.getStyles(); styles.load('items/nameLocal'); } } catch (e) { styles = null; }
+      await ctx.sync();
+      const have = {};
+      if (styles) styles.items.forEach(function (s) { have[s.nameLocal] = true; });
+      const known = function (n) { return !n || !styles || have[n] || /^Letter /.test(n); };
+      const missing = [];
+      let anchor = hit.items.length ? hit.items[0].paragraphs.getFirst() : body.paragraphs.getLast();
+      const marker = hit.items.length ? anchor : null;
+      blocks.forEach(function (b) {
+        const para = anchor.insertParagraph('', 'After');
+        if (b.style && known(b.style)) para.style = b.style;
+        else if (b.builtIn) para.styleBuiltIn = b.builtIn;
+        else { para.styleBuiltIn = 'Normal'; if (b.style && missing.indexOf(b.style) < 0) missing.push(b.style); }
+        b.runs.forEach(function (r) {
+          const range = para.insertText(r.text, 'End');
+          if (r.b) range.font.bold = true;
+          if (r.i) range.font.italic = true;
+          if (r.u) range.font.underline = 'Single';
+          if (r.href) range.hyperlink = r.href;
+        });
+        anchor = para;
+      });
+      if (marker) marker.delete();
+      await ctx.sync();
+      return missing;
+    });
+    markDocMatter(state.code);
+    out.innerHTML = '<div class="good">' + esc(p.name || 'Letter') + ' written for ' + esc(state.code) + '.</div>' +
+      (unknown.length ? '<div class="codes bad">No such Word style in the master, so Normal was used: ' + esc(unknown.join(', ')) + '</div>' : '') +
+      '<div class="muted">Save it in the matter\'s Drive folder, then Save PDF or Email PDF.</div>';
+    // codes in the master itself (letterhead, footer) and any the parts left
+    await fillFields(true);
+  } catch (e) { out.innerHTML = '<div class="bad">' + esc(e.message) + '</div>'; }
+}
+
 // Every #CODE# in the document (body, headers and footers) replaced by its value. A code with no value
 // removes its line when the line holds nothing else but a short label (e.g. "By email: #EMAIL#").
-async function fillFields() {
+async function fillFields(after) {
   const out = $('letterOut');
+  after = after === true;
   await busy($('fillBtn'), async function () {
     try {
       const L = await lettersReady(), F = L.fields || {};
@@ -420,12 +524,16 @@ async function fillFields() {
       });
       markDocMatter(state.code);
       const p = pendingLetter(); if (p && p.code === state.code) { state.emailTpl = p.email || state.emailTpl; store.set(KEY.pending, ''); }
+      if (after) {
+        if (res.unknown.length) out.insertAdjacentHTML('beforeend', '<div class="codes bad">Not known, left in the text: ' + esc(res.unknown.join(' ')) + '</div>');
+        return;
+      }
       const h = ['<div class="good">' + (res.total ? 'Filled ' + res.filled + ' field' + (res.filled === 1 ? '' : 's') + ' for ' + esc(state.code) + '.' : 'No #CODES# in this document.') + '</div>'];
       if (res.blank.length) h.push('<div class="codes">Nothing in Equinox for ' + esc(res.blank.join(' ')) + ' (left out)</div>');
       if (res.unknown.length) h.push('<div class="codes bad">Not known, left in the text: ' + esc(res.unknown.join(' ')) + '</div>');
       if (!L.live) h.push('<div class="muted">Equinox couldn\'t be reached, so addresses came from the index only.</div>');
       out.innerHTML = h.join('');
-    } catch (e) { out.innerHTML = '<div class="bad">' + esc(e.message) + '</div>'; }
+    } catch (e) { if (after) out.insertAdjacentHTML('beforeend', '<div class="bad">' + esc(e.message) + '</div>'); else out.innerHTML = '<div class="bad">' + esc(e.message) + '</div>'; }
   });
 }
 
@@ -486,7 +594,7 @@ async function emailPdf() {
 function runIntent() {
   const what = state.intent; state.intent = '';
   if (!what || !state.code) return;
-  const go = { letter: function () { $('letterAct').scrollIntoView(); $('tplSel').focus(); }, fill: fillFields, pdf: savePdfClick, email: emailPdf, file: fileToEquinox }[what];
+  const go = { letter: function () { $('letterAct').scrollIntoView(); $('tplSel').focus(); }, build: buildLetter, fill: function () { fillFields(); }, pdf: savePdfClick, email: emailPdf, file: fileToEquinox }[what];
   if (go) setTimeout(go, 50);
 }
 
@@ -504,7 +612,7 @@ function wire() {
   $('docFilter').oninput = function () { if (state.docs) renderDocs(); };
   $('docList').onclick = function (e) { const li = e.target.closest('li[data-id]'); if (li) checkout(li.getAttribute('data-id')); };
   $('letterBtn').onclick = newLetter;
-  $('fillBtn').onclick = fillFields;
+  $('fillBtn').onclick = function () { fillFields(); };
   $('pdfBtn').onclick = savePdfClick;
   $('emailBtn').onclick = emailPdf;
   $('recipSel').onchange = function () { state.recipient = this.value; loadLetter(state.code).catch(function (e) { say($('msg'), e.message, 'bad'); }); };
