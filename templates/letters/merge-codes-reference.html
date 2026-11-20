@@ -1,0 +1,153 @@
+<html><head><meta charset="utf-8"><style>body{font-family:"Aptos Narrow",Arial,sans-serif;font-size:10.5pt;color:#1f1f1f} h1{font-size:18pt} h2{font-size:13pt;margin-top:18pt} table{border-collapse:collapse;width:100%} td,th{border:1px solid #d9d9d9;padding:4pt 6pt;vertical-align:top} th{background:#f2f2f2;text-align:left} code{font-family:Consolas,"Courier New",monospace;font-size:9.5pt} .muted{color:#6b6b6b}</style></head><body>
+<h1>Equinox merge codes — reference</h1>
+<p>Every merge code Equinox offers in Smart Templates, grouped as Equinox groups them, and whether the Equinox add-on fills it in letters (Word) and cover emails (Gmail). Write a code in a template between hashes, e.g. <code>#MATTER#</code>. Codes are filled from the matter and the recipient chosen in the Word pane when the letter is made.</p>
+<p><b>✓</b> filled &nbsp; <b>◐</b> best effort — filled when Equinox returns it; check the first letter, and run <code>step26_probeLetter</code> if it comes out empty &nbsp; <b>✗</b> not available here (reason given)</p>
+<p>Rules: a code with nothing in Equinox is left empty, and a line left holding only its label (e.g. "By email:") is dropped. A code the add-on doesn't know stays in the text so you notice it. Dates take offsets (<code>#DATE+14D#</code>, <code>#NEXTFATAL-1M#</code>, <code>#H2DATE+30M#</code>). <code>#THUMBNAIL#</code> and <code>#USER_SIGNATURE#</code> are pictures. Add-on-only codes start with <code>EQX_</code>; the letter itself goes where the master says <code>#EQX_LETTER#</code>.</p>
+<h2>Letter parts</h2><table><tr><th>Where (folder: Equinox letter templates)</th><th>What it holds</th></tr><tr><td><code>Master.docx</code></td><td>Letterhead, page, footer and Word styles (Letter Date, Letter Address, Letter Reference, Letter Salutation, Letter Subject, Letter Closing, Letter Signature; headings). The letter goes at <code>#EQX_LETTER#</code>.</td></tr><tr><td><code>Headers/*.html</code></td><td>Date, recipient, references, salutation, subject.</td></tr><tr><td><code>*.html</code> (content templates)</td><td>The body. First lines name the parts and the default recipient: <code>&lt;!-- master: Master --&gt;</code> <code>&lt;!-- header: Letter --&gt;</code> <code>&lt;!-- signoff: Letter --&gt;</code> <code>&lt;!-- to: client --&gt;</code> or <code>associate</code>.</td></tr><tr><td><code>Sign-offs/*.html</code>, <code>Sign-offs/Signature.png</code></td><td>Closing and signature block; your signature image for <code>#USER_SIGNATURE#</code>.</td></tr><tr><td><code>Emails/*.html</code></td><td>Cover email for the content template of the same name (Email PDF).</td></tr><tr><td>HTML → Word</td><td>A paragraph's class is its Word style: <code>&lt;p class="letter-subject"&gt;</code> → Letter Subject. Plain <code>&lt;p&gt;</code> is Normal; <code>&lt;h1&gt;</code>–<code>&lt;h3&gt;</code>, lists and <code>&lt;blockquote&gt;</code> use Word's built-in styles; <code>&lt;strong&gt;</code>, <code>&lt;em&gt;</code>, <code>&lt;u&gt;</code>, <code>&lt;a href&gt;</code> and <code>&lt;br&gt;</code> carry across.</td></tr></table>
+<h2>Recipient — the person or organisation the letter is to</h2>
+<p class="muted">Chosen in the pane&#x27;s To list: the matter&#x27;s client (its key contact at the client&#x27;s address) by default, or an associate, a separate billing address or an applicant. A content template can choose its default with &lt;!-- to: associate --&gt;.</p>
+<table><tr><th style="width:34%">Code</th><th>What it gives</th><th style="width:7%">Here</th></tr>
+<tr><td><code>#ADDRESSNAME#</code></td><td>Name line: the contact&#x27;s address name, else their title and name, else the organisation</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#ADDRESS#</code></td><td>Address block under the name: the organisation (when writing to a person), then the address lines, city, state, postcode, and the country outside Australia</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#SALUTATION#</code></td><td>The contact&#x27;s salutation field in Equinox, exactly as entered (&quot;Dear #SALUTATION#&quot;). Empty if the recipient has no contact person; the pane then says so</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#EMAIL#</code></td><td>The contact&#x27;s email, else the location&#x27;s</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#PHONE#</code></td><td>The contact&#x27;s phone, else the location&#x27;s</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#MOBILE#</code></td><td>The contact&#x27;s mobile</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#FAXNO#</code></td><td>Fax</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#JOBTITLE#</code></td><td>The contact&#x27;s job title</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#POSTCODE#</code></td><td>Postcode of the address</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#ADDRCOUNTRY#</code></td><td>Country of the address</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#SITENAME#</code></td><td>The location&#x27;s name</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#OFFICEREF#</code></td><td>The recipient&#x27;s reference for this matter: the client reference for the client, the associate&#x27;s reference for an associate</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#EQX_YOURREF#</code></td><td>Same as OFFICEREF (the add-on&#x27;s own name for &quot;Your ref&quot;)</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#CLIENT#</code></td><td>The matter&#x27;s client (organisation name)</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#CLIENTCODE#</code></td><td>The client organisation&#x27;s code in Equinox</td><td style="text-align:center">◐</td></tr>
+<tr><td><code>#CLIENTREF#</code></td><td>The matter&#x27;s client reference</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#ACCONT#</code></td><td>Accounts contact <span class="muted">— not in the Equinox API</span></td><td style="text-align:center">✗</td></tr>
+<tr><td><code>#HOMEADDRESS#, #EXTRADDR#, #HOMECOUNTRY#, #HOMEEMAIL#, #HOMEFAXNO#, #HOMEPOSTCODE#</code></td><td>A person&#x27;s home details <span class="muted">— not in the Equinox API</span></td><td style="text-align:center">✗</td></tr>
+</table>
+<h2>Dates</h2>
+<p class="muted">Today in the formats Equinox offers. Any date code takes an offset: +/− a number and D (days), W (weeks), M (months) or Y (years).</p>
+<table><tr><th style="width:34%">Code</th><th>What it gives</th><th style="width:7%">Here</th></tr>
+<tr><td><code>#DATE#</code></td><td>Today, e.g. 20 November 2026</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#DATE+15D#</code></td><td>Today plus 15 days (any number; D, W, M or Y; + or −)</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#YEAR#</code></td><td>This year</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#USDATE#</code></td><td>Today, US style: November 20, 2026</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#DATE_FR#</code></td><td>Today in French: 20 novembre 2026</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#DATE_NL#</code></td><td>Today in Dutch: 20 november 2026</td><td style="text-align:center">✓</td></tr>
+</table>
+<h2>Parties</h2>
+<p class="muted">Applicants come from the v1 matter record; inventors and designers from the index (Equinox&#x27;s matter inventors).</p>
+<table><tr><th style="width:34%">Code</th><th>What it gives</th><th style="width:7%">Here</th></tr>
+<tr><td><code>#APPLICANT#</code></td><td>All applicants: A, B and C</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#APPLICANT| connector#</code></td><td>Applicants joined by your own word, e.g. #APPLICANT|or# → A or B</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#APPLICANT_FORMAL#</code></td><td>Formal names (the formal name where Equinox gives one)</td><td style="text-align:center">◐</td></tr>
+<tr><td><code>#APPLICANT_ADDRESSNAME#</code></td><td>Applicants&#x27; address names</td><td style="text-align:center">◐</td></tr>
+<tr><td><code>#APPLICANT_NATIONALITY#</code></td><td>Nationalities</td><td style="text-align:center">◐</td></tr>
+<tr><td><code>#APPLICANT_ADDRESS#</code></td><td>Each applicant&#x27;s address on one line</td><td style="text-align:center">◐</td></tr>
+<tr><td><code>#FIRST_APPLICANT#</code></td><td>First applicant</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#APPLICANT_ADDRESS_LETTER#, #FIRST_APPLICANT_ADDRESS#</code></td><td>First applicant&#x27;s address as a block</td><td style="text-align:center">◐</td></tr>
+<tr><td><code>#APPLICANT_NaA#, #APPLICANT_NaA_BOX#</code></td><td>Each applicant&#x27;s name and address</td><td style="text-align:center">◐</td></tr>
+<tr><td><code>#OWNER2#, #OWNER3#, #OWNER4#</code></td><td>Second to fourth applicants</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#INVENTOR#, #INVENTOR_FORMAL#</code></td><td>All inventors (patents) or designers (designs)</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#FIRSTINVENTOR#</code></td><td>First inventor</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#INVENTOR_2#, #INVENTOR_3#, #INVENTOR_4#</code></td><td>Second to fourth inventors</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#INVENTOR_SALUTATION#, #INVENTOR_ADDRESS#, #INVENTOR_NaA#, #INVENTOR_TABLE#</code></td><td>Inventor contact details and table <span class="muted">— not read yet (Equinox matter-inventors); ask if needed</span></td><td style="text-align:center">✗</td></tr>
+<tr><td><code>#LICENSEE#, #LICENSEE_FORMAL#, #FIRST_LICENSEE#</code></td><td>Licensees, if the matter record lists them</td><td style="text-align:center">◐</td></tr>
+<tr><td><code>#LICENSEE_NATIONALITY#, #LICENSEE_ADDRESS#, #LICENSEE_NaA#</code></td><td>Licensee details <span class="muted">— not read yet</span></td><td style="text-align:center">✗</td></tr>
+<tr><td><code>#MATTERASSOCIATE#</code></td><td>The associate firm(s)</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#ASSOCIATES#</code></td><td>Associate firms, one per line</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#ASSOCREF#, #MATTERASSOCIATEREF#</code></td><td>The associate&#x27;s reference</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#ASSOCIATE_NaA_BOX#</code></td><td>Associate firm name and address</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#ADDCLIENT#, #ADDCLIENTREF#, #ADDCLIENTADDRESS#</code></td><td>Additional client <span class="muted">— not in the Equinox API</span></td><td style="text-align:center">✗</td></tr>
+<tr><td><code>#OTHER_SIDE_ORGANISATION#, #OTHER_SIDE_NAME#, #OTHER_SIDE_REF#, #OTHER_SIDE_SOLICITOR_ORGANISATION#, #OTHER_SIDE_SOLICITOR_NAME#, #OTHER_SIDE_SOLICITOR_REF#</code></td><td>Other side and their solicitor <span class="muted">— not in the Equinox API</span></td><td style="text-align:center">✗</td></tr>
+</table>
+<h2>Matter</h2>
+<p class="muted">From Equinox as it is when the letter is made; the index if Equinox can&#x27;t be reached.</p>
+<table><tr><th style="width:34%">Code</th><th>What it gives</th><th style="width:7%">Here</th></tr>
+<tr><td><code>#MATTER#</code></td><td>Matter code</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#OLDCODE#</code></td><td>Old code</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#TITLE#, #LONGTITLE#</code></td><td>Title</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#SHORTTITLE#</code></td><td>Short title</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#FORMALTITLE#</code></td><td>Formal title</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#CATEGORY#, #TYPE#</code></td><td>Category, e.g. Patent, Trade Mark</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#SUBCATEGORY#</code></td><td>Subcategory</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#COUNTRY#</code></td><td>Country name</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#COUNTRYCODE#</code></td><td>Country code from the matter code</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#COUNTRYADJ#</code></td><td>Country as an adjective: Australian, New Zealand, European… (country name if not in the list)</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#STATUS#</code></td><td>Status</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#OWNER#</code></td><td>Responsible user</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#NOTES#</code></td><td>Matter notes</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#OPENDATE#</code></td><td>Open date</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#PARENTAGE#</code></td><td>Parentage, as text</td><td style="text-align:center">◐</td></tr>
+<tr><td><code>#FAMILY#</code></td><td>Equinox family ID</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#FAMILYLIST#</code></td><td>The family&#x27;s matter codes</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#THUMBNAIL#</code></td><td>The matter picture (trade mark, design, front-page figure) — a picture, not text</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#GRANTED?APPLICATION#</code></td><td>Grant or registration number if granted, else the application number</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#DESIGNATEDSTATES#, #EXTRA4#</code></td><td>Designated states</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#UNITARYPATENTCOUNTRIES#</code></td><td>Unitary patent countries</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#EXTRA1#</code></td><td>Trade mark goods and services</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#EXTRA3#</code></td><td>Trade mark classes</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#TYPEOFMARK#</code></td><td>Type of mark</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#EXTRA2#, #EXTRA5#, #EXTRA6#</code></td><td>Conditions, payment reference, product type <span class="muted">— not in the Equinox API</span></td><td style="text-align:center">✗</td></tr>
+<tr><td><code>#WHOPAYS#</code></td><td>Who pays: the billing address&#x27;s name, else the client</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#WHOPAYS_PHONE#, #WHOPAYS_FAX#, #WHOPAYS_EMAIL#</code></td><td>Billing contact details</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#INVOICEADDRESS#, #WHOPAYS_ADDRESS#</code></td><td>Billing address</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#YOURVATNO#</code></td><td>Billing (or client) VAT/ABN number</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#CUSTOM_&lt;NAME&gt;#</code></td><td>A matter custom field, by its name in capitals with other characters as _ (e.g. #CUSTOM_PRODUCT_TYPE#). Equinox&#x27;s own custom codes are Twig expressions and can&#x27;t run here</td><td style="text-align:center">◐</td></tr>
+</table>
+<h2>Tasks and deadlines</h2>
+<p class="muted">Open tasks and renewals are read from Equinox when the letter is made.</p>
+<table><tr><th style="width:34%">Code</th><th>What it gives</th><th style="width:7%">Here</th></tr>
+<tr><td><code>#NEXTFATAL#</code></td><td>Next open fatal deadline (takes offsets: #NEXTFATAL-1M#)</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#EQX_NEXTFATALTEXT#</code></td><td>That deadline&#x27;s description (the add-on&#x27;s own)</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#DUEACTIONS#</code></td><td>Open tasks, one per line: date – description</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#RENEWAL#, #NEXTRENEWAL#</code></td><td>Next renewal due date (takes offsets)</td><td style="text-align:center">◐</td></tr>
+<tr><td><code>#NEXTRENEWALTEXT#</code></td><td>Next renewal&#x27;s description</td><td style="text-align:center">◐</td></tr>
+<tr><td><code>#RENDEADLINES#</code></td><td>Renewal deadlines, one per line</td><td style="text-align:center">◐</td></tr>
+<tr><td><code>#EXPIRYDATE#</code></td><td>Expiry date (takes offsets)</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#DONEACTIONS#, #OFFICIALACTIONS#, #OPPOSITION#</code></td><td>Completed tasks, official actions, opposition <span class="muted">— not read yet; ask if needed</span></td><td style="text-align:center">✗</td></tr>
+<tr><td><code>#TASKDATE#, #BASEDATE#, #PARENTTASK_DUEDATE#, #PRESET_TASK_DATE_X#</code></td><td>Dates of the task a letter is generated from <span class="muted">— letters here aren&#x27;t generated from an Equinox task</span></td><td style="text-align:center">✗</td></tr>
+</table>
+<h2>History dates</h2>
+<p class="muted">Equinox&#x27;s history types: H1 earliest priority, H2 filing / application, H3 publication, H4 grant / registration, H5 national or regional phase entry, H6 national publication, H7 first office action, H8 EP search report, H50 request for unitary effect, H51 unitary effect registered, H52 UPC opt-out, H53 opt-out withdrawn. Any number works.</p>
+<table><tr><th style="width:34%">Code</th><th>What it gives</th><th style="width:7%">Here</th></tr>
+<tr><td><code>#H1CODE … HnCODE#</code></td><td>The number (e.g. application number for H2)</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#H1DATE … HnDATE#</code></td><td>The date (takes offsets: #H1DATE+12M#)</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#HnCOUNTRY#, #HnCC#</code></td><td>Country code</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#HnNOCC#</code></td><td>The number without its country prefix</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#HnTITLE#</code></td><td>The history type&#x27;s name</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#H1CCNAME#</code></td><td>Priority country</td><td style="text-align:center">◐</td></tr>
+<tr><td><code>#H5ORH2CODE#, #H5ORH2DATE#, #H6ORH3CODE#, #H6ORH3DATE#, #HxORHyCODE/DATE#</code></td><td>The first if present, else the second (any numbers)</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#ADDPRIOS#</code></td><td>Further priority claims <span class="muted">— not read yet</span></td><td style="text-align:center">✗</td></tr>
+</table>
+<h2>Case users and you</h2>
+<p class="muted">Equinox doesn&#x27;t give letter names or titles through its API, so yours come from Script Properties: LETTER_NAME, LETTER_NAME2, LETTER_TITLE (to LETTER_TITLE6) and LETTER_PHONE. Otherwise the matter&#x27;s responsible user is used.</p>
+<table><tr><th style="width:34%">Code</th><th>What it gives</th><th style="width:7%">Here</th></tr>
+<tr><td><code>#USERLETTERNAME#</code></td><td>Your name for letters</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#USERLETTERNAME2#</code></td><td>Second name line (LETTER_NAME2)</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#USERLETTERTITLE … USERLETTERTITLE6#</code></td><td>Your titles (LETTER_TITLE … LETTER_TITLE6)</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#USEREMAIL#, #USERINITIALS (UI)#, #USERPHONE#</code></td><td>Responsible user&#x27;s email, initials, phone</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#USER2…#, #USER3…#, #USER4… (EMAIL#, #INITIALS#, #PHONE#, #LETTERNAME)#</code></td><td>Formalities, secretary and trainee users, where Equinox gives them</td><td style="text-align:center">◐</td></tr>
+<tr><td><code>#USER_SIGNATURE#, #LOGIN_SIGNATURE#</code></td><td>Your signature — a picture: the image named Signature (.png or .jpg) in the Sign-offs folder</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#USERLETTERFIRSTNAME#, #LOGINLETTERNAME#, #CURRENTUSERLETTERNAME#, #LOGINTITLE#, #CURRENTUSERLETTERTITLE…6#, #LOGININITIALS#, #UI_LOGIN#, #CURRENTUSERINITIALS#, #CURRENTUSEREMAIL#, #CURRENTUSERPHONE#</code></td><td>The person making the letter: the same as you above</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#CC#</code></td><td>Copy-to list <span class="muted">— Equinox doesn&#x27;t support it in Smart Templates either</span></td><td style="text-align:center">✗</td></tr>
+</table>
+<h2>Primary (key) contact</h2>
+<p class="muted">The client&#x27;s key contact at the client&#x27;s address.</p>
+<table><tr><th style="width:34%">Code</th><th>What it gives</th><th style="width:7%">Here</th></tr>
+<tr><td><code>#PC_NAME#</code></td><td>Name</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#PC_ADDRESS#</code></td><td>Address</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#PC_POSTCODE#</code></td><td>Postcode</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#PC_PHONE#</code></td><td>Phone</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#PC_FAX#</code></td><td>Fax</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#PC_EMAIL#</code></td><td>Email</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#PC_NaA#</code></td><td>Name and address</td><td style="text-align:center">✓</td></tr>
+<tr><td><code>#PC_HOMEPHONE#, #PC_HOMEMOBILE#, #PC_HOMEFAX#, #PC_HOMEEMAIL#</code></td><td>Home details <span class="muted">— not in the Equinox API</span></td><td style="text-align:center">✗</td></tr>
+</table>
+<h2>Invoices and cover sheets</h2>
+<table><tr><th style="width:34%">Code</th><th>What it gives</th><th style="width:7%">Here</th></tr>
+<tr><td><code>#ACCONTEMAIL#, #BILLINGREFERENCE#, #BG#, #INVOICENUMBER#, #OURREF#, #TAXDATE#, #TAXDATEPLUS#, #PAYTERM#, #INVOICETABLE#, #SCHEDULETABLE#, #OVERVIEWTABLE#</code></td><td>Invoice codes <span class="muted">— invoices stay in Equinox</span></td><td style="text-align:center">✗</td></tr>
+<tr><td><code>#CHARGESHEET_DESCRIPTION_X#, #CHARGESHEET_AMOUNT_X#</code></td><td>Charge sheet items <span class="muted">— stay in Equinox</span></td><td style="text-align:center">✗</td></tr>
+</table>
+<p class="muted">Source: Equinox Help Centre, Correspondence templates (merge codes); the add-on's side is features 13.8 and 13.9 (Word.gs). Kept in step with the code: v0.0.103.</p></body></html>

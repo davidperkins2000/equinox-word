@@ -11,7 +11,7 @@
  * path tells the web app which matter it is. Nothing is deleted or overwritten in Equinox or Drive.
  */
 'use strict';
-const PANE_VERSION = 'w0.4.0';
+const PANE_VERSION = 'w0.5.0';
 
 const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto', pending: 'eqxw.pending' };
 const store = {
@@ -107,7 +107,7 @@ async function start() {
     const p = pendingLetter(), marked = docMatter();
     const code = (p && p.code) || marked;
     if (code) {
-      if (p) { state.recipient = p.recipient || ''; state.emailTpl = p.email || ''; if (!state.intent) state.intent = p.html ? 'build' : 'fill'; }
+      if (p) { state.recipient = p.recipient || ''; state.recipientChosen = !!p.recipient; state.emailTpl = p.email || ''; if (!state.intent) state.intent = p.html ? 'build' : 'fill'; }
       $('docLine').textContent = p ? 'New letter for ' + code + '. Save it in the matter\'s Drive folder when you\'re ready.' : 'Unsaved document for ' + code + '.';
       showMatches({ codes: [code], matters: [{ code: code, title: '' }], how: 'typed' });
     }
@@ -330,7 +330,7 @@ async function openCopy() {
 // Templates are Word files in the "Equinox letter templates" Drive folder. New letter opens one as a new
 // document and leaves a note (this add-in's storage, shared by its panes) so the pane in that new window knows
 // the matter and recipient and fills the fields straight away. Fill fields works on any open document.
-const CODE_RE = /#[A-Z0-9_?+\-]+#/g;
+const CODE_RE = /#[A-Z][A-Z0-9_?+\-]*(?:\|[^#\n<>]{0,24})?#/g;
 function pendingLetter() {
   try { const p = JSON.parse(store.get(KEY.pending) || 'null'); return p && Date.now() - p.at < 15 * 60000 ? p : null; } catch (e) { return null; }
 }
@@ -345,13 +345,19 @@ async function loadLetter(code) {
     $('tplSel').innerHTML = state.templates.length ? state.templates.map(function (t) {
       return '<option value="' + esc(t.id) + '">' + esc(t.name) + '</option>'; }).join('') : '<option value="">No templates yet</option>';
   }
-  const r = await call('letterFields', { code: code, recipient: state.recipient });
+  const tpl = (state.templates || []).filter(function (t) { return t.id === $('tplSel').value; })[0] || {};
+  const r = await call('letterFields', { code: code, recipient: state.recipientChosen ? state.recipient : '', to: tpl.to || 'client', codes: ['DATE'] });
   if (state.code !== code) return;
   state.letter = r; state.recipient = r.recipient || '';
   $('recipSel').innerHTML = (r.recipients || []).map(function (x) {
     return '<option value="' + esc(x.key) + '"' + (x.key === r.recipient ? ' selected' : '') + '>' + esc(x.label) + (x.email ? ' — ' + esc(x.email) : '') + '</option>';
   }).join('') || '<option value="">No contacts found in Equinox</option>';
+  showWarnings(r.warnings);
   return r;
+}
+function showWarnings(w) {
+  const box = $('letterWarn');
+  if (box) box.innerHTML = (w || []).map(function (x) { return '<div class="codes">' + esc(x) + '</div>'; }).join('');
 }
 async function lettersReady() {
   if (!state.code) throw new Error('Choose the matter first.');
@@ -370,10 +376,11 @@ async function newLetter() {
       out.innerHTML = '<div class="muted">Putting together ' + esc(t.name || 'the letter') + '…</div>';
       let base64;
       if (t.kind === 'parts') {   // master + header + content + sign-off, filled by the script
-        const r = await call('letterBuild', { code: state.code, recipient: state.recipient, id: id });
-        store.set(KEY.pending, JSON.stringify({ code: state.code, recipient: state.recipient, tpl: id, name: r.name, email: r.email || '', html: r.html, at: Date.now() }));
+        const r = await call('letterBuild', { code: state.code, recipient: state.recipientChosen ? state.recipient : '', id: id });
+        store.set(KEY.pending, JSON.stringify({ code: state.code, recipient: r.recipient, tpl: id, name: r.name, email: r.email || '', html: r.html,
+          images: r.images || {}, warnings: r.warnings || [], at: Date.now() }));
         base64 = r.master;
-        if ((r.missing || []).length) out.insertAdjacentHTML('beforeend', '<div class="bad">Missing in Drive: ' + esc(r.missing.join(', ')) + '</div>');
+        if ((r.missing || []).length) out.insertAdjacentHTML('beforeend', '<div class="bad">Not found or not known: ' + esc(r.missing.join(', ')) + '</div>');
       } else {                    // a whole-document template: opened, then its codes filled
         const r = await call('template', { id: id });
         store.set(KEY.pending, JSON.stringify({ code: state.code, recipient: state.recipient, tpl: id, email: t.email || '', at: Date.now() }));
@@ -402,6 +409,7 @@ function letterBlocks(html) {
       if (n.nodeType !== 1) return;
       const tag = n.tagName.toLowerCase();
       if (tag === 'br') { lines.push([]); return; }
+      if (tag === 'img') { if (n.getAttribute('data-eqx')) lines[lines.length - 1].push({ img: n.getAttribute('data-eqx'), text: '' }); return; }
       const f = Object.assign({}, fmt);
       if (tag === 'strong' || tag === 'b') f.b = true;
       if (tag === 'em' || tag === 'i') f.i = true;
@@ -415,7 +423,8 @@ function letterBlocks(html) {
     runsOf(node, {}, lines);
     lines.forEach(function (runs) {
       if (runs.length) { runs[0].text = runs[0].text.replace(/^\s+/, ''); runs[runs.length - 1].text = runs[runs.length - 1].text.replace(/\s+$/, ''); }
-      blocks.push({ style: style, builtIn: builtIn, runs: runs.filter(function (r) { return r.text; }) });
+      if (runs.length && !runs[0].img) runs[0].text = runs[0].text.replace(/^\s+/, '');
+      blocks.push({ style: style, builtIn: builtIn, runs: runs.filter(function (r) { return r.text || r.img; }) });
     });
   };
   const walk = function (parent) {
@@ -458,6 +467,11 @@ async function buildLetter() {
         else if (b.builtIn) para.styleBuiltIn = b.builtIn;
         else { para.styleBuiltIn = 'Normal'; if (b.style && missing.indexOf(b.style) < 0) missing.push(b.style); }
         b.runs.forEach(function (r) {
+          if (r.img) {
+            const im = (p.images || {})[r.img];
+            if (im && im.base64) { const pic = para.insertInlinePictureFromBase64(im.base64, 'End'); pic.lockAspectRatio = true; if (im.width) pic.width = im.width; }
+            return;
+          }
           const range = para.insertText(r.text, 'End');
           if (r.b) range.font.bold = true;
           if (r.i) range.font.italic = true;
@@ -471,6 +485,7 @@ async function buildLetter() {
       return missing;
     });
     markDocMatter(state.code);
+    showWarnings(p.warnings);
     out.innerHTML = '<div class="good">' + esc(p.name || 'Letter') + ' written for ' + esc(state.code) + '.</div>' +
       (unknown.length ? '<div class="codes bad">No such Word style in the master, so Normal was used: ' + esc(unknown.join(', ')) + '</div>' : '') +
       '<div class="muted">Save it in the matter\'s Drive folder, then Save PDF or Email PDF.</div>';
@@ -486,29 +501,44 @@ async function fillFields(after) {
   after = after === true;
   await busy($('fillBtn'), async function () {
     try {
-      const L = await lettersReady(), F = L.fields || {};
-      const res = await Word.run(async function (ctx) {
-        const parts = [ctx.document.body];
+      if (!state.code) throw new Error('Choose the matter first.');
+      const parts = async function (ctx) {
+        const list = [ctx.document.body];
         const secs = ctx.document.sections; secs.load('items'); await ctx.sync();
-        secs.items.forEach(function (s) { ['Primary', 'FirstPage'].forEach(function (t) { parts.push(s.getHeader(t)); parts.push(s.getFooter(t)); }); });
-        parts.forEach(function (p) { p.load('text'); }); await ctx.sync();
+        secs.items.forEach(function (s) { ['Primary', 'FirstPage'].forEach(function (t) { list.push(s.getHeader(t)); list.push(s.getFooter(t)); }); });
+        return list;
+      };
+      // 1. the codes in the document (body, headers, footers)
+      const codes = await Word.run(async function (ctx) {
+        const list = await parts(ctx);
+        list.forEach(function (x) { x.load('text'); }); await ctx.sync();
         const found = {};
-        parts.forEach(function (p) { (String(p.text || '').match(CODE_RE) || []).forEach(function (k) { found[k] = true; }); });
-        const codes = Object.keys(found), unknown = [], blank = [], hits = [];
+        list.forEach(function (x) { (String(x.text || '').match(CODE_RE) || []).forEach(function (k) { found[k] = true; }); });
+        return Object.keys(found);
+      });
+      if (!codes.length) { if (!after) out.innerHTML = '<div class="muted">No #CODES# in this document.</div>'; return; }
+      // 2. their values from Equinox, for the chosen recipient
+      const L = await call('letterFields', { code: state.code, recipient: state.recipient, codes: codes.map(function (k) { return k.slice(1, -1); }) });
+      const F = L.fields || {}, I = L.images || {};
+      // 3. replace them
+      const res = await Word.run(async function (ctx) {
+        const list = await parts(ctx);
+        const unknown = [], blank = [], hits = [];
         codes.forEach(function (k) {
           const key = k.slice(1, -1);
-          if (!Object.prototype.hasOwnProperty.call(F, key)) { unknown.push(k); return; }
-          parts.forEach(function (p) { const r = p.search(k, { matchCase: true }); r.load('items'); hits.push({ k: k, v: String(F[key] || ''), r: r }); });
+          if (!Object.prototype.hasOwnProperty.call(F, key) && !I[key]) { unknown.push(k); return; }
+          list.forEach(function (x) { const r = x.search(k, { matchCase: true }); r.load('items'); hits.push({ k: k, v: String(F[key] || ''), img: I[key], r: r }); });
         });
         await ctx.sync();
         let filled = 0;
         const empties = [];
         hits.forEach(function (h) {
           h.r.items.forEach(function (range) {
-            if (h.v) { range.insertText(h.v, 'Replace'); filled++; }
+            if (h.img) { const pic = range.insertInlinePictureFromBase64(h.img.base64, 'Replace'); pic.lockAspectRatio = true; if (h.img.width) pic.width = h.img.width; filled++; }
+            else if (h.v) { range.insertText(h.v, 'Replace'); filled++; }
             else { empties.push(range.paragraphs.getFirst()); range.insertText('', 'Replace'); }
           });
-          if (!h.v && h.r.items.length && blank.indexOf(h.k) < 0) blank.push(h.k);
+          if (!h.v && !h.img && h.r.items.length && blank.indexOf(h.k) < 0) blank.push(h.k);
         });
         await ctx.sync();
         // lines left holding only a short label (or nothing) go; each such line once
@@ -528,10 +558,11 @@ async function fillFields(after) {
         if (res.unknown.length) out.insertAdjacentHTML('beforeend', '<div class="codes bad">Not known, left in the text: ' + esc(res.unknown.join(' ')) + '</div>');
         return;
       }
-      const h = ['<div class="good">' + (res.total ? 'Filled ' + res.filled + ' field' + (res.filled === 1 ? '' : 's') + ' for ' + esc(state.code) + '.' : 'No #CODES# in this document.') + '</div>'];
+      showWarnings(L.warnings);
+      const h = ['<div class="good">Filled ' + res.filled + ' field' + (res.filled === 1 ? '' : 's') + ' for ' + esc(state.code) + '.</div>'];
       if (res.blank.length) h.push('<div class="codes">Nothing in Equinox for ' + esc(res.blank.join(' ')) + ' (left out)</div>');
       if (res.unknown.length) h.push('<div class="codes bad">Not known, left in the text: ' + esc(res.unknown.join(' ')) + '</div>');
-      if (!L.live) h.push('<div class="muted">Equinox couldn\'t be reached, so addresses came from the index only.</div>');
+      if (!L.live) h.push('<div class="muted">Equinox couldn\'t be reached, so details came from the index only.</div>');
       out.innerHTML = h.join('');
     } catch (e) { if (after) out.insertAdjacentHTML('beforeend', '<div class="bad">' + esc(e.message) + '</div>'); else out.innerHTML = '<div class="bad">' + esc(e.message) + '</div>'; }
   });
@@ -615,7 +646,8 @@ function wire() {
   $('fillBtn').onclick = function () { fillFields(); };
   $('pdfBtn').onclick = savePdfClick;
   $('emailBtn').onclick = emailPdf;
-  $('recipSel').onchange = function () { state.recipient = this.value; loadLetter(state.code).catch(function (e) { say($('msg'), e.message, 'bad'); }); };
+  $('recipSel').onchange = function () { state.recipient = this.value; state.recipientChosen = true; loadLetter(state.code).catch(function (e) { say($('msg'), e.message, 'bad'); }); };
+  $('tplSel').onchange = function () { if (!state.recipientChosen && state.code) loadLetter(state.code).catch(function () {}); };
   document.body.addEventListener('click', function (e) {
     const a = e.target.closest('a[data-href]'); if (a) { e.preventDefault(); openLink(a.getAttribute('data-href')); }
     if (e.target.id === 'openCopy') openCopy();
