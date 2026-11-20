@@ -11,7 +11,7 @@
  * path tells the web app which matter it is. Nothing is deleted or overwritten in Equinox or Drive.
  */
 'use strict';
-const PANE_VERSION = 'w0.5.0';
+const PANE_VERSION = 'w0.6.0';
 
 const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto', pending: 'eqxw.pending' };
 const store = {
@@ -415,6 +415,7 @@ function letterBlocks(html) {
       if (tag === 'em' || tag === 'i') f.i = true;
       if (tag === 'u') f.u = true;
       if (tag === 'a' && n.getAttribute('href')) f.href = n.getAttribute('href');
+      if (tag === 'span' && n.className) f.cs = styleName(n.className);   // a Word character style (eureka-mark → "Eureka Mark")
       runsOf(n, f, lines);
     });
   };
@@ -457,7 +458,7 @@ async function buildLetter() {
       await ctx.sync();
       const have = {};
       if (styles) styles.items.forEach(function (s) { have[s.nameLocal] = true; });
-      const known = function (n) { return !n || !styles || have[n] || /^Letter /.test(n); };
+      const known = function (n) { return !n || !styles || have[n] || /^(Letter |Eureka )/.test(n); };
       const missing = [];
       let anchor = hit.items.length ? hit.items[0].paragraphs.getFirst() : body.paragraphs.getLast();
       const marker = hit.items.length ? anchor : null;
@@ -477,6 +478,7 @@ async function buildLetter() {
           if (r.i) range.font.italic = true;
           if (r.u) range.font.underline = 'Single';
           if (r.href) range.hyperlink = r.href;
+          if (r.cs && known(r.cs)) range.style = r.cs; else if (r.cs && missing.indexOf(r.cs) < 0) missing.push(r.cs);
         });
         anchor = para;
       });
