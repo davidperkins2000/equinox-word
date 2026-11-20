@@ -57,6 +57,13 @@
         <label class="check"><input id="sumImage" type="checkbox"> Picture</label>
         <div id="sumOut" class="out"></div>
       </div>
+      <div class="act" id="letterAct">
+        <h3>Letter</h3>
+        <div class="row"><select id="tplSel" title="Letter template"></select><button id="letterBtn" class="primary">New letter</button></div>
+        <label class="field">To <select id="recipSel"></select></label>
+        <div class="row wrap"><button id="fillBtn">Fill fields</button><button id="pdfBtn">Save PDF</button><button id="emailBtn">Email PDF</button></div>
+        <div id="letterOut" class="out"></div>
+      </div>
       <div class="act">
         <button id="docsBtn">Open from Equinox…</button>
         <div id="docs" hidden>

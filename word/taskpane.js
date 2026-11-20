@@ -11,9 +11,9 @@
  * path tells the web app which matter it is. Nothing is deleted or overwritten in Equinox or Drive.
  */
 'use strict';
-const PANE_VERSION = 'w0.2.2';
+const PANE_VERSION = 'w0.3.0';
 
-const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto' };
+const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto', pending: 'eqxw.pending' };
 const store = {
   get: function (k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } },
   set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage blocked: kept for this session only */ } mem[k] = v; }
@@ -23,7 +23,8 @@ const val = function (k) { return store.get(k) || mem[k] || ''; };
 
 const $ = function (id) { return document.getElementById(id); };
 const esc = function (t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
-const state = { doc: { name: '', path: '' }, codes: [], matters: [], code: '', matter: null, docs: null };
+const state = { doc: { name: '', path: '' }, codes: [], matters: [], code: '', matter: null, docs: null,
+                letter: null, templates: null, recipient: '', intent: '' };
 
 // ---------- the web app ----------
 async function call(action, data) {
@@ -101,10 +102,24 @@ async function start() {
   state.doc = docInfo();
   $('docLine').textContent = state.doc.name ? state.doc.name : 'This document isn\'t saved yet. Save it in the matter\'s Drive folder, or type a matter below.';
   if (!val(KEY.url) || !val(KEY.token)) { openSettings('Welcome. Type the web app address and token to connect.'); return; }
-  if (!state.doc.name) return;
+  if (!state.doc.name) {
+    // a letter just opened from a template (New letter), or an unsaved document already given a matter
+    const p = pendingLetter(), marked = docMatter();
+    const code = (p && p.code) || marked;
+    if (code) {
+      if (p) { state.recipient = p.recipient || ''; state.emailTpl = p.email || ''; if (!state.intent) state.intent = 'fill'; }
+      $('docLine').textContent = p ? 'New letter for ' + code + '. Save it in the matter\'s Drive folder when you\'re ready.' : 'Unsaved document for ' + code + '.';
+      showMatches({ codes: [code], matters: [{ code: code, title: '' }], how: 'typed' });
+    }
+    return;
+  }
   say($('msg'), 'Finding the matter…');
-  try { showMatches(await call('lookup', { name: state.doc.name, path: state.doc.path })); }
-  catch (e) { say($('msg'), e.message, 'bad'); }
+  try {
+    const out = await call('lookup', { name: state.doc.name, path: state.doc.path });
+    const marked = docMatter();   // a letter saved outside the matter's folder still knows its matter
+    if (!(out.codes || []).length && marked) showMatches({ codes: [marked], matters: [{ code: marked, title: '' }], how: 'typed' });
+    else showMatches(out);
+  } catch (e) { say($('msg'), e.message, 'bad'); }
 }
 
 async function typed(ev) {
@@ -142,6 +157,8 @@ async function select(code) {
     const out = await call('matter', { code: code, image: val(KEY.img) === '1' });
     if (state.code !== code) return;     // another matter was chosen meanwhile
     state.matter = out; renderMatter(out); $('actions').hidden = false;
+    loadLetter(code).catch(function () {});
+    runIntent();
   } catch (e) { $('matter').innerHTML = '<span class="bad">' + esc(e.message) + '</span>'; }
 }
 
@@ -309,6 +326,170 @@ async function openCopy() {
   catch (e) { $('coOut').insertAdjacentHTML('beforeend', '<div class="bad">' + esc(e.message) + '</div>'); }
 }
 
+// ---------- 13.8 Letters ----------
+// Templates are Word files in the "Equinox letter templates" Drive folder. New letter opens one as a new
+// document and leaves a note (this add-in's storage, shared by its panes) so the pane in that new window knows
+// the matter and recipient and fills the fields straight away. Fill fields works on any open document.
+const CODE_RE = /#[A-Z0-9_?+\-]+#/g;
+function pendingLetter() {
+  try { const p = JSON.parse(store.get(KEY.pending) || 'null'); return p && Date.now() - p.at < 15 * 60000 ? p : null; } catch (e) { return null; }
+}
+function docMatter() { try { return Office.context.document.settings.get('Equinox.matter') || ''; } catch (e) { return ''; } }
+function markDocMatter(code) {
+  try { const st = Office.context.document.settings; if (st.get('Equinox.matter') === code) return; st.set('Equinox.matter', code); st.saveAsync(function () {}); } catch (e) { /* not kept */ }
+}
+
+async function loadLetter(code) {
+  if (!state.templates) {
+    try { state.templates = (await call('templates')).templates || []; } catch (e) { state.templates = []; }
+    $('tplSel').innerHTML = state.templates.length ? state.templates.map(function (t) {
+      return '<option value="' + esc(t.id) + '">' + esc(t.name) + '</option>'; }).join('') : '<option value="">No templates yet</option>';
+  }
+  const r = await call('letterFields', { code: code, recipient: state.recipient });
+  if (state.code !== code) return;
+  state.letter = r; state.recipient = r.recipient || '';
+  $('recipSel').innerHTML = (r.recipients || []).map(function (x) {
+    return '<option value="' + esc(x.key) + '"' + (x.key === r.recipient ? ' selected' : '') + '>' + esc(x.label) + (x.email ? ' — ' + esc(x.email) : '') + '</option>';
+  }).join('') || '<option value="">No contacts found in Equinox</option>';
+  return r;
+}
+async function lettersReady() {
+  if (!state.code) throw new Error('Choose the matter first.');
+  if (!state.letter || state.letter.code !== state.code || (state.letter.recipient || '') !== (state.recipient || '')) await loadLetter(state.code);
+  return state.letter;
+}
+
+async function newLetter() {
+  const out = $('letterOut');
+  await busy($('letterBtn'), async function () {
+    try {
+      if (!canCreate()) throw new Error('This version of Word can\'t open a new document from the add-in.');
+      const id = $('tplSel').value;
+      if (!id) { out.innerHTML = '<div class="bad">No templates in the "Equinox letter templates" Drive folder yet.</div>'; return; }
+      const t = (state.templates || []).filter(function (x) { return x.id === id; })[0] || {};
+      out.innerHTML = '<div class="muted">Opening ' + esc(t.name || 'the template') + '…</div>';
+      const r = await call('template', { id: id });
+      store.set(KEY.pending, JSON.stringify({ code: state.code, recipient: state.recipient, tpl: id, email: t.email || '', at: Date.now() }));
+      await Word.run(async function (ctx) { ctx.application.createDocument(r.base64).open(); await ctx.sync(); });
+      out.innerHTML = '<div class="good">Opened in a new window.</div><div class="muted">If its fields aren\'t filled in a moment, choose Equinox → Fill fields there.</div>';
+    } catch (e) { out.innerHTML = '<div class="bad">' + esc(e.message) + '</div>'; }
+  });
+}
+
+// Every #CODE# in the document (body, headers and footers) replaced by its value. A code with no value
+// removes its line when the line holds nothing else but a short label (e.g. "By email: #EMAIL#").
+async function fillFields() {
+  const out = $('letterOut');
+  await busy($('fillBtn'), async function () {
+    try {
+      const L = await lettersReady(), F = L.fields || {};
+      const res = await Word.run(async function (ctx) {
+        const parts = [ctx.document.body];
+        const secs = ctx.document.sections; secs.load('items'); await ctx.sync();
+        secs.items.forEach(function (s) { ['Primary', 'FirstPage'].forEach(function (t) { parts.push(s.getHeader(t)); parts.push(s.getFooter(t)); }); });
+        parts.forEach(function (p) { p.load('text'); }); await ctx.sync();
+        const found = {};
+        parts.forEach(function (p) { (String(p.text || '').match(CODE_RE) || []).forEach(function (k) { found[k] = true; }); });
+        const codes = Object.keys(found), unknown = [], blank = [], hits = [];
+        codes.forEach(function (k) {
+          const key = k.slice(1, -1);
+          if (!Object.prototype.hasOwnProperty.call(F, key)) { unknown.push(k); return; }
+          parts.forEach(function (p) { const r = p.search(k, { matchCase: true }); r.load('items'); hits.push({ k: k, v: String(F[key] || ''), r: r }); });
+        });
+        await ctx.sync();
+        let filled = 0;
+        const empties = [];
+        hits.forEach(function (h) {
+          h.r.items.forEach(function (range) {
+            if (h.v) { range.insertText(h.v, 'Replace'); filled++; }
+            else { empties.push(range.paragraphs.getFirst()); range.insertText('', 'Replace'); }
+          });
+          if (!h.v && h.r.items.length && blank.indexOf(h.k) < 0) blank.push(h.k);
+        });
+        await ctx.sync();
+        // lines left holding only a short label (or nothing) go; each such line once
+        empties.forEach(function (para) { para.load('text'); });
+        await ctx.sync();
+        const gone = {};
+        empties.forEach(function (para) {
+          const rest = String(para.text || '').replace(CODE_RE, '').trim();
+          if ((/^[A-Za-z][A-Za-z .]{0,20}:$/.test(rest) || !rest || /^(in the name of|by email|by fax)$/i.test(rest)) && !gone[rest]) { gone[rest] = true; para.delete(); }
+        });
+        await ctx.sync();
+        return { filled: filled, unknown: unknown, blank: blank, total: codes.length };
+      });
+      markDocMatter(state.code);
+      const p = pendingLetter(); if (p && p.code === state.code) { state.emailTpl = p.email || state.emailTpl; store.set(KEY.pending, ''); }
+      const h = ['<div class="good">' + (res.total ? 'Filled ' + res.filled + ' field' + (res.filled === 1 ? '' : 's') + ' for ' + esc(state.code) + '.' : 'No #CODES# in this document.') + '</div>'];
+      if (res.blank.length) h.push('<div class="codes">Nothing in Equinox for ' + esc(res.blank.join(' ')) + ' (left out)</div>');
+      if (res.unknown.length) h.push('<div class="codes bad">Not known, left in the text: ' + esc(res.unknown.join(' ')) + '</div>');
+      if (!L.live) h.push('<div class="muted">Equinox couldn\'t be reached, so addresses came from the index only.</div>');
+      out.innerHTML = h.join('');
+    } catch (e) { out.innerHTML = '<div class="bad">' + esc(e.message) + '</div>'; }
+  });
+}
+
+// ---------- 13.9 PDF to Drive and Gmail ----------
+function documentPdfBase64() {
+  return new Promise(function (resolve, reject) {
+    Office.context.document.getFileAsync(Office.FileType.Pdf, { sliceSize: 4194304 }, function (r) {
+      if (r.status !== Office.AsyncResultStatus.Succeeded) { reject(new Error(r.error && r.error.message || 'Word could not make the PDF')); return; }
+      const file = r.value, n = file.sliceCount, parts = [];
+      const next = function (i) {
+        file.getSliceAsync(i, function (s) {
+          if (s.status !== Office.AsyncResultStatus.Succeeded) { file.closeAsync(); reject(new Error(s.error && s.error.message || 'Word could not make the PDF')); return; }
+          parts[i] = s.value.data;
+          if (i + 1 < n) next(i + 1); else { file.closeAsync(); resolve(toBase64(parts)); }
+        });
+      };
+      next(0);
+    });
+  });
+}
+async function savePdf(quiet) {
+  const out = $('letterOut');
+  if (!state.code) throw new Error('Choose the matter first.');
+  state.doc = docInfo();
+  if (!quiet) out.innerHTML = '<div class="muted">Making the PDF…</div>';
+  const b64 = await documentPdfBase64();
+  const r = await call('savePdf', { code: state.code, name: state.doc.name, base64: b64 });
+  markDocMatter(state.code);
+  state.pdf = r;
+  out.innerHTML = '<div class="good">' + (r.saved ? 'Saved ' : 'Already in the Drive folder: ') + '<b>' + esc(r.name) + '</b></div>' +
+    '<div><a data-href="' + esc(r.url) + '">View in Drive</a>' + (r.folderPath ? ' <span class="muted">· ' + esc(r.folderPath) + '</span>' : '') + '</div>';
+  return r;
+}
+async function savePdfClick() {
+  await busy($('pdfBtn'), async function () { try { await savePdf(false); } catch (e) { $('letterOut').innerHTML = '<div class="bad">' + esc(e.message) + '</div>'; } });
+}
+async function emailPdf() {
+  const out = $('letterOut');
+  await busy($('emailBtn'), async function () {
+    try {
+      await lettersReady();
+      out.innerHTML = '<div class="muted">Making the PDF…</div>';
+      const pdf = await savePdf(true);
+      out.insertAdjacentHTML('beforeend', '<div class="muted">Making the Gmail draft…</div>');
+      const rec = (state.letter.recipients || []).filter(function (x) { return x.key === state.recipient; })[0] || {};
+      const tpl = state.emailTpl || (((state.templates || []).filter(function (t) { return t.id === $('tplSel').value; })[0]) || {}).email || '';
+      const r = await call('pdfDraft', { code: state.code, fileId: pdf.fileId, recipient: state.recipient, to: rec.email || '', template: tpl });
+      out.innerHTML = '<div class="good">Gmail draft ready' + (r.to ? ' to ' + esc(r.to) : ' (add the recipient in Gmail)') + ', with ' + esc(pdf.name) + ' attached.</div>' +
+        '<div><a data-href="' + esc(r.url) + '">Open the draft in Gmail</a></div>' +
+        '<div class="muted">Once you send it, it is filed to Equinox with the PDF.</div>';
+      openLink(r.url);
+    } catch (e) { out.innerHTML = '<div class="bad">' + esc(e.message) + '</div>'; }
+  });
+}
+
+// ---------- ribbon buttons ----------
+// Each Equinox-tab button opens this pane with ?do=… ; the action runs once the matter is known.
+function runIntent() {
+  const what = state.intent; state.intent = '';
+  if (!what || !state.code) return;
+  const go = { letter: function () { $('letterAct').scrollIntoView(); $('tplSel').focus(); }, fill: fillFields, pdf: savePdfClick, email: emailPdf, file: fileToEquinox }[what];
+  if (go) setTimeout(go, 50);
+}
+
 // ---------- wiring ----------
 function wire() {
   $('gear').onclick = function () { $('settings').hidden ? openSettings('') : closeSettings(); };
@@ -322,6 +503,11 @@ function wire() {
   $('docsBtn').onclick = showDocs;
   $('docFilter').oninput = function () { if (state.docs) renderDocs(); };
   $('docList').onclick = function (e) { const li = e.target.closest('li[data-id]'); if (li) checkout(li.getAttribute('data-id')); };
+  $('letterBtn').onclick = newLetter;
+  $('fillBtn').onclick = fillFields;
+  $('pdfBtn').onclick = savePdfClick;
+  $('emailBtn').onclick = emailPdf;
+  $('recipSel').onchange = function () { state.recipient = this.value; loadLetter(state.code).catch(function (e) { say($('msg'), e.message, 'bad'); }); };
   document.body.addEventListener('click', function (e) {
     const a = e.target.closest('a[data-href]'); if (a) { e.preventDefault(); openLink(a.getAttribute('data-href')); }
     if (e.target.id === 'openCopy') openCopy();
@@ -332,6 +518,7 @@ function wire() {
 if (typeof Office !== 'undefined') {
   Office.onReady(function (info) {
     wire();
+    try { state.intent = new URLSearchParams(location.search).get('do') || ''; } catch (e) { state.intent = ''; }
     if (info.host !== Office.HostType.Word) { $('docLine').textContent = 'Open this page from Word (Home → Equinox).'; return; }
     start();
   });

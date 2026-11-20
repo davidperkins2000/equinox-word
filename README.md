@@ -7,7 +7,8 @@ word/taskpane.html   the pane
 word/taskpane.js     what it does (pane version in PANE_VERSION)
 word/taskpane.css    how it looks (follows the Mac's light or dark mode)
 word/assets/         icons
-word/manifest.xml    tells Word where the pane lives (made by make-manifest.py)
+word/manifest.xml    tells Word where the pane lives and adds the Equinox ribbon tab (made by make-manifest.py)
+templates/           starter letter template and its cover email, to copy into the Drive templates folder
 make-manifest.py     writes manifest.xml for a hosting address
 ```
 
@@ -38,3 +39,14 @@ Settings → Pages → Build and deployment → Source: **Deploy from a branch**
 - **File to Equinox:** sends the document as Word has it now, including unsaved changes. Each version files once; an edited document files as a new one. "Also file to" adds the other matched matters.
 - **Insert summary:** the matter summary table at the cursor, optionally with the next deadline and the picture.
 - **Open from Equinox:** lists the matter's Equinox documents. Choosing one saves it into the matter's Drive folder (never overwriting) and shows where it is on the Mac, so you open and edit it there. "Open a copy now" opens an unsaved copy, for reading.
+
+## Letters (pane w0.3.0, script v0.0.101)
+
+The **Equinox** tab on Word's ribbon has: Equinox (the pane), File to Equinox, New letter, Fill fields, Save PDF and Email PDF. Each button opens the pane, which does that job once it knows the matter.
+
+- **Templates** are ordinary Word files in the Drive folder **Equinox letter templates**, next to the index sheet (the script makes it the first time the pane asks). Start with `templates/Blank letter.docx`. Write Equinox's merge codes in the text, e.g. `#MATTER#`, `#APPLICANT#`, `#H2CODE#`, `#ADDRESSNAME#`, `#ADDRESS#`, `#SALUTATION#`. An `.html` file with the same name (`Blank letter.html`) is the cover email used by Email PDF.
+- **New letter** opens the chosen template as a new document for the matter and recipient chosen in the pane; the pane in the new window fills it. **Fill fields** fills any open document. A code with nothing in Equinox is left out, and so is a line holding only its label (e.g. "By email:"). Codes the add-on doesn't know stay in the text.
+- **Save PDF** saves the document as a PDF in the matter's Drive folder (never overwriting). **Email PDF** does that and makes a Gmail draft with the PDF attached, the matter subject line, the recipient's email and the cover email. Once sent, it is filed to Equinox with the PDF (Outgoing switch on).
+- The signer lines use Script Properties `LETTER_NAME`, `LETTER_TITLE` and `LETTER_PHONE` if set, else the matter's responsible user in Equinox.
+
+After this update, copy the new `word/manifest.xml` (1.0.4.0) into the `wef` folder and restart Word, so the Equinox tab appears.

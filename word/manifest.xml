@@ -7,7 +7,7 @@
            xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
            xsi:type="TaskPaneApp">
   <Id>6f1c2e4a-8d3b-4e5f-9a7c-2b1d0e3f4a51</Id>
-  <Version>1.0.3.0</Version>
+  <Version>1.0.4.0</Version>
   <ProviderName>Eureka IP</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Equinox"/>
@@ -49,6 +49,71 @@
                 </Control>
               </Group>
             </OfficeTab>
+            <CustomTab id="Eqx.Tab">
+              <Group id="Eqx.MatterGroup">
+                <Label resid="Matter.Label"/>
+                <Icon><bt:Image size="16" resid="Icon.16"/><bt:Image size="32" resid="Icon.32"/><bt:Image size="80" resid="Icon.80"/></Icon>
+                <Control xsi:type="Button" id="Eqx.TabOpen">
+                  <Label resid="Pane.Btn"/>
+                  <Supertip><Title resid="Pane.Btn"/><Description resid="Pane.Tip"/></Supertip>
+                  <Icon><bt:Image size="16" resid="Icon.16"/><bt:Image size="32" resid="Icon.32"/><bt:Image size="80" resid="Icon.80"/></Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>Office.AutoShowTaskpaneWithDocument</TaskpaneId>
+                    <SourceLocation resid="Pane.Url"/>
+                  </Action>
+                </Control>
+                <Control xsi:type="Button" id="Eqx.File">
+                  <Label resid="File.Btn"/>
+                  <Supertip><Title resid="File.Btn"/><Description resid="File.Tip"/></Supertip>
+                  <Icon><bt:Image size="16" resid="File.16"/><bt:Image size="32" resid="File.32"/><bt:Image size="80" resid="File.80"/></Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>Office.AutoShowTaskpaneWithDocument</TaskpaneId>
+                    <SourceLocation resid="Pane.File.Url"/>
+                  </Action>
+                </Control>
+              </Group>
+              <Group id="Eqx.LetterGroup">
+                <Label resid="Letter.Label"/>
+                <Icon><bt:Image size="16" resid="Letter.16"/><bt:Image size="32" resid="Letter.32"/><bt:Image size="80" resid="Letter.80"/></Icon>
+                <Control xsi:type="Button" id="Eqx.Letter">
+                  <Label resid="Letter.Btn"/>
+                  <Supertip><Title resid="Letter.Btn"/><Description resid="Letter.Tip"/></Supertip>
+                  <Icon><bt:Image size="16" resid="Letter.16"/><bt:Image size="32" resid="Letter.32"/><bt:Image size="80" resid="Letter.80"/></Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>Office.AutoShowTaskpaneWithDocument</TaskpaneId>
+                    <SourceLocation resid="Pane.Letter.Url"/>
+                  </Action>
+                </Control>
+                <Control xsi:type="Button" id="Eqx.Fill">
+                  <Label resid="Fill.Btn"/>
+                  <Supertip><Title resid="Fill.Btn"/><Description resid="Fill.Tip"/></Supertip>
+                  <Icon><bt:Image size="16" resid="Fill.16"/><bt:Image size="32" resid="Fill.32"/><bt:Image size="80" resid="Fill.80"/></Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>Office.AutoShowTaskpaneWithDocument</TaskpaneId>
+                    <SourceLocation resid="Pane.Fill.Url"/>
+                  </Action>
+                </Control>
+                <Control xsi:type="Button" id="Eqx.Pdf">
+                  <Label resid="Pdf.Btn"/>
+                  <Supertip><Title resid="Pdf.Btn"/><Description resid="Pdf.Tip"/></Supertip>
+                  <Icon><bt:Image size="16" resid="Pdf.16"/><bt:Image size="32" resid="Pdf.32"/><bt:Image size="80" resid="Pdf.80"/></Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>Office.AutoShowTaskpaneWithDocument</TaskpaneId>
+                    <SourceLocation resid="Pane.Pdf.Url"/>
+                  </Action>
+                </Control>
+                <Control xsi:type="Button" id="Eqx.Email">
+                  <Label resid="Email.Btn"/>
+                  <Supertip><Title resid="Email.Btn"/><Description resid="Email.Tip"/></Supertip>
+                  <Icon><bt:Image size="16" resid="Email.16"/><bt:Image size="32" resid="Email.32"/><bt:Image size="80" resid="Email.80"/></Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>Office.AutoShowTaskpaneWithDocument</TaskpaneId>
+                    <SourceLocation resid="Pane.Email.Url"/>
+                  </Action>
+                </Control>
+              </Group>
+              <Label resid="Tab.Label"/>
+            </CustomTab>
           </ExtensionPoint>
         </DesktopFormFactor>
       </Host>
@@ -58,20 +123,55 @@
         <bt:Image id="Icon.16" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/assets/icon-16.png"/>
         <bt:Image id="Icon.32" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/assets/icon-32.png"/>
         <bt:Image id="Icon.80" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/assets/icon-80.png"/>
+        <bt:Image id="File.16" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/assets/file-16.png"/>
+        <bt:Image id="File.32" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/assets/file-32.png"/>
+        <bt:Image id="File.80" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/assets/file-80.png"/>
+        <bt:Image id="Letter.16" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/assets/letter-16.png"/>
+        <bt:Image id="Letter.32" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/assets/letter-32.png"/>
+        <bt:Image id="Letter.80" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/assets/letter-80.png"/>
+        <bt:Image id="Fill.16" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/assets/fill-16.png"/>
+        <bt:Image id="Fill.32" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/assets/fill-32.png"/>
+        <bt:Image id="Fill.80" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/assets/fill-80.png"/>
+        <bt:Image id="Pdf.16" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/assets/pdf-16.png"/>
+        <bt:Image id="Pdf.32" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/assets/pdf-32.png"/>
+        <bt:Image id="Pdf.80" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/assets/pdf-80.png"/>
+        <bt:Image id="Email.16" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/assets/email-16.png"/>
+        <bt:Image id="Email.32" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/assets/email-32.png"/>
+        <bt:Image id="Email.80" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/assets/email-80.png"/>
       </bt:Images>
       <bt:Urls>
         <bt:Url id="Pane.Url" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/taskpane.html"/>
         <bt:Url id="Commands.Url" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/commands.html"/>
+        <bt:Url id="Pane.File.Url" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/taskpane.html?do=file"/>
+        <bt:Url id="Pane.Letter.Url" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/taskpane.html?do=letter"/>
+        <bt:Url id="Pane.Fill.Url" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/taskpane.html?do=fill"/>
+        <bt:Url id="Pane.Pdf.Url" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/taskpane.html?do=pdf"/>
+        <bt:Url id="Pane.Email.Url" DefaultValue="https://davidperkins2000.github.io/equinox-word/word/taskpane.html?do=email"/>
         <bt:Url id="Home.Url" DefaultValue="https://eurekaip.com.au"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Equinox is ready"/>
         <bt:String id="Group.Label" DefaultValue="Equinox"/>
         <bt:String id="Button.Label" DefaultValue="Equinox"/>
+        <bt:String id="Tab.Label" DefaultValue="Equinox"/>
+        <bt:String id="Matter.Label" DefaultValue="Matter"/>
+        <bt:String id="Letter.Label" DefaultValue="Letter"/>
+        <bt:String id="Pane.Btn" DefaultValue="Equinox"/>
+        <bt:String id="File.Btn" DefaultValue="File to Equinox"/>
+        <bt:String id="Letter.Btn" DefaultValue="New letter"/>
+        <bt:String id="Fill.Btn" DefaultValue="Fill fields"/>
+        <bt:String id="Pdf.Btn" DefaultValue="Save PDF"/>
+        <bt:String id="Email.Btn" DefaultValue="Email PDF"/>
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="GetStarted.Description" DefaultValue="Open Home, then Equinox, to see the document's matter."/>
         <bt:String id="Button.Tip" DefaultValue="Show the Equinox matter for this document: details, File to Equinox, Open from Equinox and Insert summary."/>
+        <bt:String id="Pane.Tip" DefaultValue="Show the Equinox pane for this document."/>
+        <bt:String id="File.Tip" DefaultValue="File this document to the matter in Equinox."/>
+        <bt:String id="Letter.Tip" DefaultValue="Open a letter template as a new document for this matter."/>
+        <bt:String id="Fill.Tip" DefaultValue="Fill the #CODES# in this document from Equinox."/>
+        <bt:String id="Pdf.Tip" DefaultValue="Save this document as a PDF in the matter's Drive folder."/>
+        <bt:String id="Email.Tip" DefaultValue="Save the PDF and make a Gmail draft with it attached, to be filed to Equinox once sent."/>
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>
