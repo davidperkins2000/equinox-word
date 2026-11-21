@@ -11,7 +11,7 @@
  * path tells the web app which matter it is. Nothing is deleted or overwritten in Equinox or Drive.
  */
 'use strict';
-const PANE_VERSION = 'w0.6.0';
+const PANE_VERSION = 'w0.7.0';
 
 const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto', pending: 'eqxw.pending' };
 const store = {
@@ -394,7 +394,10 @@ async function newLetter() {
 
 // The letter's HTML (header, content, sign-off from letterBuild) written into this document where the master says
 // #EQX_LETTER# (else at the end), one Word paragraph per HTML paragraph or line. A paragraph's class names its Word
-// style (letter-subject → "Letter Subject"); h1–h3, list items and blockquotes use Word's built-in styles.
+// style (letter-subject → "Letter Subject"); h1–h3, list items and blockquotes use Word's built-in styles. A list
+// item is in List Bullet or List Number, a level further in (List Bullet 2, 3) for each list it sits inside, unless
+// its class names the style. A table becomes a Word table in its class's table style (default Eureka Table), the
+// text only, first row as a header row when it is <th> cells.
 const BUILT_IN = { h1: 'Heading1', h2: 'Heading2', h3: 'Heading3', ul: 'ListBullet', ol: 'ListNumber', blockquote: 'Quote' };
 function styleName(cls) {
   const first = String(cls || '').trim().split(/\s+/)[0];
@@ -409,6 +412,8 @@ function letterBlocks(html) {
       if (n.nodeType !== 1) return;
       const tag = n.tagName.toLowerCase();
       if (tag === 'br') { lines.push([]); return; }
+      if (tag === 'ul' || tag === 'ol') return;
+      if ((tag === 'p' || tag === 'div') && lines[lines.length - 1].length) lines.push([]);
       if (tag === 'img') { if (n.getAttribute('data-eqx')) lines[lines.length - 1].push({ img: n.getAttribute('data-eqx'), text: '' }); return; }
       const f = Object.assign({}, fmt);
       if (tag === 'strong' || tag === 'b') f.b = true;
@@ -428,12 +433,34 @@ function letterBlocks(html) {
       blocks.push({ style: style, builtIn: builtIn, runs: runs.filter(function (r) { return r.text || r.img; }) });
     });
   };
+  const list = function (el, depth) {
+    const t = el.tagName.toLowerCase();
+    Array.prototype.forEach.call(el.children, function (li) {
+      if (li.tagName.toLowerCase() !== 'li') return;
+      add(li, li.className ? styleName(li.className) : (t === 'ol' ? 'List Number' : 'List Bullet') + (depth > 1 ? ' ' + Math.min(3, depth) : ''), BUILT_IN[t]);
+      Array.prototype.forEach.call(li.children, function (c) { if (/^(ul|ol)$/i.test(c.tagName)) list(c, depth + 1); });
+    });
+  };
+  const cellText = function (c) {
+    const lines = [[]];
+    runsOf(c, {}, lines);
+    return lines.map(function (runs) { return runs.map(function (r) { return r.text || ''; }).join('').trim(); }).filter(Boolean).join('\n');
+  };
   const walk = function (parent) {
     parent.childNodes.forEach(function (n) {
       if (n.nodeType === 3) { if (n.nodeValue.trim()) blocks.push({ style: '', runs: [{ text: n.nodeValue.trim() }] }); return; }
       if (n.nodeType !== 1) return;
       const tag = n.tagName.toLowerCase();
-      if (tag === 'ul' || tag === 'ol') { Array.prototype.forEach.call(n.children, function (li) { add(li, styleName(li.className), BUILT_IN[tag]); }); return; }
+      if (tag === 'ul' || tag === 'ol') { list(n, 1); return; }
+      if (tag === 'table') {
+        const trs = Array.prototype.slice.call(n.querySelectorAll('tr'));
+        const rows = trs.map(function (tr) { return Array.prototype.map.call(tr.children, cellText); });
+        const cols = Math.max.apply(null, [1].concat(rows.map(function (r) { return r.length; })));
+        rows.forEach(function (r) { while (r.length < cols) r.push(''); });
+        if (rows.length) blocks.push({ table: true, style: n.className ? styleName(n.className) : 'Eureka Table', rows: rows,
+          head: !!(trs[0] && trs[0].children[0] && trs[0].children[0].tagName.toLowerCase() === 'th') });
+        return;
+      }
       if (tag === 'div' || tag === 'section') { walk(n); return; }
       add(n, styleName(n.className), n.className ? '' : (BUILT_IN[tag] || ''));
     });
@@ -458,12 +485,22 @@ async function buildLetter() {
       await ctx.sync();
       const have = {};
       if (styles) styles.items.forEach(function (s) { have[s.nameLocal] = true; });
-      const known = function (n) { return !n || !styles || have[n] || /^(Letter |Eureka )/.test(n); };
+      const known = function (n) { return !n || !styles || have[n] || /^(Letter |Eureka )/.test(n) && !/^Eureka Table$/.test(n); };
       const missing = [];
       let anchor = hit.items.length ? hit.items[0].paragraphs.getFirst() : body.paragraphs.getLast();
       const marker = hit.items.length ? anchor : null;
+      let after = null;   // the empty paragraph Word keeps after a table: the next paragraph's text goes in it
       blocks.forEach(function (b) {
-        const para = anchor.insertParagraph('', 'After');
+        if (b.table) {
+          const tbl = (after || anchor).insertTable(b.rows.length, b.rows[0].length, 'After', b.rows);
+          if (styles && have[b.style]) tbl.style = b.style;
+          else { tbl.styleBuiltIn = 'TableGrid'; if (missing.indexOf(b.style) < 0) missing.push(b.style); }
+          if (b.head) tbl.headerRowCount = 1;
+          after = tbl.insertParagraph('', 'After'); anchor = after;
+          return;
+        }
+        const para = after || anchor.insertParagraph('', 'After');
+        after = null;
         if (b.style && known(b.style)) para.style = b.style;
         else if (b.builtIn) para.styleBuiltIn = b.builtIn;
         else { para.styleBuiltIn = 'Normal'; if (b.style && missing.indexOf(b.style) < 0) missing.push(b.style); }
