@@ -11,7 +11,7 @@
  * path tells the web app which matter it is. Nothing is deleted or overwritten in Equinox or Drive.
  */
 'use strict';
-const PANE_VERSION = 'w0.8.0';
+const PANE_VERSION = 'w0.9.0';
 
 const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto', pending: 'eqxw.pending' };
 const store = {
@@ -107,7 +107,7 @@ async function start() {
     const p = pendingLetter(), marked = docMatter();
     const code = (p && p.code) || marked;
     if (code) {
-      if (p) { state.recipient = p.recipient || ''; state.recipientChosen = !!p.recipient; state.emailTpl = p.email || ''; if (!state.intent) state.intent = p.html ? 'build' : 'fill'; }
+      if (p) { state.recipient = p.recipient || ''; state.recipientChosen = !!p.recipient; state.emailTpl = p.email || ''; if (p.subject) setDocSubject(p.subject); if (!state.intent) state.intent = p.html ? 'build' : 'fill'; }
       $('docLine').textContent = p ? 'New letter for ' + code + '. Save it in the matter\'s Drive folder when you\'re ready.' : 'Unsaved document for ' + code + '.';
       showMatches({ codes: [code], matters: [{ code: code, title: '' }], how: 'typed' });
     }
@@ -335,6 +335,11 @@ function pendingLetter() {
   try { const p = JSON.parse(store.get(KEY.pending) || 'null'); return p && Date.now() - p.at < 15 * 60000 ? p : null; } catch (e) { return null; }
 }
 function docMatter() { try { return Office.context.document.settings.get('Equinox.matter') || ''; } catch (e) { return ''; } }
+// the email subject kept with the document: the letter template's (from New letter) or your own
+function docSubject() { try { return Office.context.document.settings.get('Equinox.subject') || ''; } catch (e) { return ''; } }
+function setDocSubject(s) {
+  try { const st = Office.context.document.settings; if ((st.get('Equinox.subject') || '') === s) return; if (s) st.set('Equinox.subject', s); else st.remove('Equinox.subject'); st.saveAsync(function () {}); } catch (e) { /* not kept */ }
+}
 function markDocMatter(code) {
   try { const st = Office.context.document.settings; if (st.get('Equinox.matter') === code) return; st.set('Equinox.matter', code); st.saveAsync(function () {}); } catch (e) { /* not kept */ }
 }
@@ -356,6 +361,8 @@ async function loadLetter(code) {
   const me = (r.recipients || []).filter(function (x) { return x.key === r.recipient; })[0] || {};
   state.mail = { to: me.email ? [me.email] : [], cc: me.cc ? [me.cc] : [], bcc: [] };
   renderMail();
+  state.stdSubject = r.subject || '';
+  $('subjIn').value = docSubject() || state.stdSubject;
   showWarnings(r.warnings);
   return r;
 }
@@ -398,7 +405,7 @@ async function newLetter() {
       let base64;
       if (t.kind === 'parts') {   // master + header + content + sign-off, filled by the script
         const r = await call('letterBuild', { code: state.code, recipient: state.recipientChosen ? state.recipient : '', id: id });
-        store.set(KEY.pending, JSON.stringify({ code: state.code, recipient: r.recipient, tpl: id, name: r.name, email: r.email || '', html: r.html,
+        store.set(KEY.pending, JSON.stringify({ code: state.code, recipient: r.recipient, tpl: id, name: r.name, email: r.email || '', subject: r.subject || '', html: r.html,
           images: r.images || {}, warnings: r.warnings || [], at: Date.now() }));
         base64 = r.master;
         if ((r.missing || []).length) out.insertAdjacentHTML('beforeend', '<div class="bad">Not found or not known: ' + esc(r.missing.join(', ')) + '</div>');
@@ -671,7 +678,7 @@ async function emailPdf() {
       out.insertAdjacentHTML('beforeend', '<div class="muted">Making the Gmail draft…</div>');
       const M = state.mail || { to: [], cc: [], bcc: [] };
       const tpl = state.emailTpl || (((state.templates || []).filter(function (t) { return t.id === $('tplSel').value; })[0]) || {}).email || '';
-      const r = await call('pdfDraft', { code: state.code, fileId: pdf.fileId, recipient: state.recipient, to: M.to, cc: M.cc, bcc: M.bcc, template: tpl });
+      const r = await call('pdfDraft', { code: state.code, fileId: pdf.fileId, recipient: state.recipient, to: M.to, cc: M.cc, bcc: M.bcc, subject: $('subjIn').value.trim(), template: tpl });
       out.innerHTML = '<div class="good">Gmail draft ready' + (r.to ? ' to ' + esc(r.to) : ' (add the recipient in Gmail)') + ', with ' + esc(pdf.name) + ' attached.</div>' +
         '<div><a data-href="' + esc(r.url) + '">Open the draft in Gmail</a></div>' +
         '<div class="muted">Once you send it, it is filed to Equinox with the PDF.</div>';
@@ -706,6 +713,8 @@ function wire() {
   $('fillBtn').onclick = function () { fillFields(); };
   $('pdfBtn').onclick = savePdfClick;
   $('emailBtn').onclick = emailPdf;
+  $('subjIn').oninput = function () { const v = this.value.trim(); setDocSubject(v && v !== state.stdSubject ? v : ''); };
+  $('subjIn').onchange = function () { if (!this.value.trim()) this.value = state.stdSubject || ''; };
   $('mailTo').onchange = function (e) {
     const k = e.target.getAttribute('data-k'); if (!k || !e.target.value || !state.mail) return;
     state.mail[k].push(e.target.value); renderMail();
