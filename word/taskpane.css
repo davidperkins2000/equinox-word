@@ -78,3 +78,11 @@ label.field { display: flex; align-items: center; gap: 6px; margin: 8px 0; font-
 label.field select { flex: 1; min-width: 0; }
 .row.wrap { flex-wrap: wrap; }
 .out .codes { font-size: 11px; color: var(--muted); word-break: break-all; }
+
+/* Email PDF's addresses: To / Cc / Bcc, each a dropdown of the matter's contacts */
+.mailto { margin: 4px 0 8px; display: grid; grid-template-columns: auto 1fr; gap: 4px 6px; align-items: start; font-size: 12px; }
+.mailto > b { font-weight: 500; color: var(--muted); padding-top: 5px; }
+.mailto .chips { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.mailto .chip { padding: 2px 4px 2px 8px; border-radius: 12px; border: 1px solid var(--line); background: var(--soft); }
+.mailto .chip button { border: none; background: none; padding: 0 3px; color: var(--muted); }
+.mailto select { width: auto; max-width: 100%; font-size: 12px; padding: 2px 4px; }

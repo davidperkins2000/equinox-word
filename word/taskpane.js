@@ -11,7 +11,7 @@
  * path tells the web app which matter it is. Nothing is deleted or overwritten in Equinox or Drive.
  */
 'use strict';
-const PANE_VERSION = 'w0.7.0';
+const PANE_VERSION = 'w0.8.0';
 
 const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto', pending: 'eqxw.pending' };
 const store = {
@@ -352,8 +352,29 @@ async function loadLetter(code) {
   $('recipSel').innerHTML = (r.recipients || []).map(function (x) {
     return '<option value="' + esc(x.key) + '"' + (x.key === r.recipient ? ' selected' : '') + '>' + esc(x.label) + (x.email ? ' — ' + esc(x.email) : '') + '</option>';
   }).join('') || '<option value="">No contacts found in Equinox</option>';
+  // the email's addresses start as the recipient's email (To) and their cc in Equinox (Cc)
+  const me = (r.recipients || []).filter(function (x) { return x.key === r.recipient; })[0] || {};
+  state.mail = { to: me.email ? [me.email] : [], cc: me.cc ? [me.cc] : [], bcc: [] };
+  renderMail();
   showWarnings(r.warnings);
   return r;
+}
+// To / Cc / Bcc for Email PDF: what is chosen, as chips, and a dropdown of every contact on the matter with an email
+function renderMail() {
+  const box = $('mailTo'); if (!box) return;
+  const M = state.mail || { to: [], cc: [], bcc: [] };
+  const people = [];
+  ((state.letter && state.letter.recipients) || []).forEach(function (x) {
+    if (x.email) people.push({ a: x.email, l: x.label + ' — ' + x.email });
+    if (x.cc && x.cc !== x.email) people.push({ a: x.cc, l: x.label + ' (their cc) — ' + x.cc });
+  });
+  box.innerHTML = [['to', 'To'], ['cc', 'Cc'], ['bcc', 'Bcc']].map(function (f) {
+    const k = f[0], used = M.to.concat(M.cc, M.bcc);
+    return '<b>' + f[1] + '</b><div class="chips">' + M[k].map(function (a, i) {
+      return '<span class="chip">' + esc(a) + '<button data-k="' + k + '" data-i="' + i + '" title="Remove">×</button></span>'; }).join('') +
+      '<select data-k="' + k + '"><option value="">+ add…</option>' + people.filter(function (p) { return used.indexOf(p.a) < 0; })
+        .map(function (p) { return '<option value="' + esc(p.a) + '">' + esc(p.l) + '</option>'; }).join('') + '</select></div>';
+  }).join('');
 }
 function showWarnings(w) {
   const box = $('letterWarn');
@@ -648,9 +669,9 @@ async function emailPdf() {
       out.innerHTML = '<div class="muted">Making the PDF…</div>';
       const pdf = await savePdf(true);
       out.insertAdjacentHTML('beforeend', '<div class="muted">Making the Gmail draft…</div>');
-      const rec = (state.letter.recipients || []).filter(function (x) { return x.key === state.recipient; })[0] || {};
+      const M = state.mail || { to: [], cc: [], bcc: [] };
       const tpl = state.emailTpl || (((state.templates || []).filter(function (t) { return t.id === $('tplSel').value; })[0]) || {}).email || '';
-      const r = await call('pdfDraft', { code: state.code, fileId: pdf.fileId, recipient: state.recipient, to: rec.email || '', template: tpl });
+      const r = await call('pdfDraft', { code: state.code, fileId: pdf.fileId, recipient: state.recipient, to: M.to, cc: M.cc, bcc: M.bcc, template: tpl });
       out.innerHTML = '<div class="good">Gmail draft ready' + (r.to ? ' to ' + esc(r.to) : ' (add the recipient in Gmail)') + ', with ' + esc(pdf.name) + ' attached.</div>' +
         '<div><a data-href="' + esc(r.url) + '">Open the draft in Gmail</a></div>' +
         '<div class="muted">Once you send it, it is filed to Equinox with the PDF.</div>';
@@ -685,6 +706,14 @@ function wire() {
   $('fillBtn').onclick = function () { fillFields(); };
   $('pdfBtn').onclick = savePdfClick;
   $('emailBtn').onclick = emailPdf;
+  $('mailTo').onchange = function (e) {
+    const k = e.target.getAttribute('data-k'); if (!k || !e.target.value || !state.mail) return;
+    state.mail[k].push(e.target.value); renderMail();
+  };
+  $('mailTo').onclick = function (e) {
+    const b = e.target.closest('button[data-k]'); if (!b || !state.mail) return;
+    state.mail[b.getAttribute('data-k')].splice(Number(b.getAttribute('data-i')), 1); renderMail();
+  };
   $('recipSel').onchange = function () { state.recipient = this.value; state.recipientChosen = true; loadLetter(state.code).catch(function (e) { say($('msg'), e.message, 'bad'); }); };
   $('tplSel').onchange = function () { if (!state.recipientChosen && state.code) loadLetter(state.code).catch(function () {}); };
   document.body.addEventListener('click', function (e) {
