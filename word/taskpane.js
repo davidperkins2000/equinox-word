@@ -11,7 +11,7 @@
  * path tells the web app which matter it is. Nothing is deleted or overwritten in Equinox or Drive.
  */
 'use strict';
-const PANE_VERSION = 'w0.9.1';
+const PANE_VERSION = 'w0.9.2';
 
 const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto', pending: 'eqxw.pending' };
 const store = {
@@ -330,7 +330,7 @@ async function openCopy() {
 // Templates are Word files in the "Equinox letter templates" Drive folder. New letter opens one as a new
 // document and leaves a note (this add-in's storage, shared by its panes) so the pane in that new window knows
 // the matter and recipient and fills the fields straight away. Fill fields works on any open document.
-const CODE_RE = /#[A-Z][A-Z0-9_?+\-]*(?:\|[^#\n<>]{0,24})?#/g;
+const CODE_RE = /#[A-Z][A-Z0-9_?+\-]*(?:\|[^#\n<>]{0,60})?#/g;
 function pendingLetter() {
   try { const p = JSON.parse(store.get(KEY.pending) || 'null'); return p && Date.now() - p.at < 15 * 60000 ? p : null; } catch (e) { return null; }
 }
