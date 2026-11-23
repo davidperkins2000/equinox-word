@@ -11,7 +11,7 @@
  * path tells the web app which matter it is. Nothing is deleted or overwritten in Equinox or Drive.
  */
 'use strict';
-const PANE_VERSION = 'w0.9.0';
+const PANE_VERSION = 'w0.9.1';
 
 const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto', pending: 'eqxw.pending' };
 const store = {
@@ -357,9 +357,10 @@ async function loadLetter(code) {
   $('recipSel').innerHTML = (r.recipients || []).map(function (x) {
     return '<option value="' + esc(x.key) + '"' + (x.key === r.recipient ? ' selected' : '') + '>' + esc(x.label) + (x.email ? ' — ' + esc(x.email) : '') + '</option>';
   }).join('') || '<option value="">No contacts found in Equinox</option>';
-  // the email's addresses start as the recipient's email (To) and their cc in Equinox (Cc)
+  // the email's addresses start as remembered for this matter or its associate or client (set in Studio, 13.13),
+  // else the recipient's email (To) and their cc in Equinox (Cc)
   const me = (r.recipients || []).filter(function (x) { return x.key === r.recipient; })[0] || {};
-  state.mail = { to: me.email ? [me.email] : [], cc: me.cc ? [me.cc] : [], bcc: [] };
+  state.mail = me.mail ? { to: me.mail.to.slice(), cc: me.mail.cc.slice(), bcc: me.mail.bcc.slice() } : { to: me.email ? [me.email] : [], cc: me.cc ? [me.cc] : [], bcc: [] };
   renderMail();
   state.stdSubject = r.subject || '';
   $('subjIn').value = docSubject() || state.stdSubject;
