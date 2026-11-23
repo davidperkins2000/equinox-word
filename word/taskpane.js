@@ -11,7 +11,7 @@
  * path tells the web app which matter it is. Nothing is deleted or overwritten in Equinox or Drive.
  */
 'use strict';
-const PANE_VERSION = 'w0.9.1';
+const PANE_VERSION = 'w0.9.2';
 
 const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto', pending: 'eqxw.pending' };
 const store = {
@@ -351,16 +351,19 @@ async function loadLetter(code) {
       return '<option value="' + esc(t.id) + '">' + esc(t.name) + '</option>'; }).join('') : '<option value="">No templates yet</option>';
   }
   const tpl = (state.templates || []).filter(function (t) { return t.id === $('tplSel').value; })[0] || {};
-  const r = await call('letterFields', { code: code, recipient: state.recipientChosen ? state.recipient : '', to: tpl.to || 'client', codes: ['DATE'] });
+  // no recipient picked: the one kept for this template on this matter (set in Studio, 13.13), else whom it goes to
+  const r = await call('letterFields', { code: code, recipient: state.recipientChosen ? state.recipient : '', to: tpl.to || 'client',
+                                         template: state.recipientChosen ? '' : (tpl.name || ''), codes: ['DATE'] });
   if (state.code !== code) return;
   state.letter = r; state.recipient = r.recipient || '';
   $('recipSel').innerHTML = (r.recipients || []).map(function (x) {
     return '<option value="' + esc(x.key) + '"' + (x.key === r.recipient ? ' selected' : '') + '>' + esc(x.label) + (x.email ? ' — ' + esc(x.email) : '') + '</option>';
   }).join('') || '<option value="">No contacts found in Equinox</option>';
-  // the email's addresses start as remembered for this matter or its associate or client (set in Studio, 13.13),
-  // else the recipient's email (To) and their cc in Equinox (Cc)
+  // the email's addresses start as remembered for this template on this matter, else for this matter or its
+  // associate or client (set in Studio, 13.13), else the recipient's email (To) and their cc in Equinox (Cc)
   const me = (r.recipients || []).filter(function (x) { return x.key === r.recipient; })[0] || {};
-  state.mail = me.mail ? { to: me.mail.to.slice(), cc: me.mail.cc.slice(), bcc: me.mail.bcc.slice() } : { to: me.email ? [me.email] : [], cc: me.cc ? [me.cc] : [], bcc: [] };
+  const kept = r.tplMail && tpl.name ? r.tplMail[tpl.name.toLowerCase()] : null;
+  state.mail = kept && kept.recipient === r.recipient ? { to: kept.to.slice(), cc: kept.cc.slice(), bcc: kept.bcc.slice() } : me.mail ? { to: me.mail.to.slice(), cc: me.mail.cc.slice(), bcc: me.mail.bcc.slice() } : { to: me.email ? [me.email] : [], cc: me.cc ? [me.cc] : [], bcc: [] };
   renderMail();
   state.stdSubject = r.subject || '';
   $('subjIn').value = docSubject() || state.stdSubject;
@@ -725,7 +728,7 @@ function wire() {
     state.mail[b.getAttribute('data-k')].splice(Number(b.getAttribute('data-i')), 1); renderMail();
   };
   $('recipSel').onchange = function () { state.recipient = this.value; state.recipientChosen = true; loadLetter(state.code).catch(function (e) { say($('msg'), e.message, 'bad'); }); };
-  $('tplSel').onchange = function () { if (!state.recipientChosen && state.code) loadLetter(state.code).catch(function () {}); };
+  $('tplSel').onchange = function () { state.recipientChosen = false; if (state.code) loadLetter(state.code).catch(function () {}); };
   document.body.addEventListener('click', function (e) {
     const a = e.target.closest('a[data-href]'); if (a) { e.preventDefault(); openLink(a.getAttribute('data-href')); }
     if (e.target.id === 'openCopy') openCopy();
