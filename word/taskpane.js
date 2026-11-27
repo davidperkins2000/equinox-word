@@ -11,7 +11,7 @@
  * path tells the web app which matter it is. Nothing is deleted or overwritten in Equinox or Drive.
  */
 'use strict';
-const PANE_VERSION = 'w0.9.2';
+const PANE_VERSION = 'w0.9.3';
 
 const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto', pending: 'eqxw.pending' };
 const store = {
@@ -491,6 +491,8 @@ function letterBlocks(html) {
         return;
       }
       if (tag === 'div' || tag === 'section') { walk(n); return; }
+      // <hr class="page-break"> (or <p class="page-break"></p>): what follows starts a new page
+      if (/\bpage-break\b/.test(n.className || '') && (tag === 'hr' || !n.textContent.trim())) { blocks.push({ brk: true }); return; }
       add(n, styleName(n.className), n.className ? '' : (BUILT_IN[tag] || ''));
     });
   };
@@ -519,7 +521,10 @@ async function buildLetter() {
       let anchor = hit.items.length ? hit.items[0].paragraphs.getFirst() : body.paragraphs.getLast();
       const marker = hit.items.length ? anchor : null;
       let after = null;   // the empty paragraph Word keeps after a table: the next paragraph's text goes in it
+      let brk = false;    // a page break waiting: the next paragraph or table starts a new page
       blocks.forEach(function (b) {
+        if (b.brk) { brk = true; return; }
+        if (b.table && brk) { (after || anchor).insertBreak(Word.BreakType.page, 'After'); brk = false; }
         if (b.table) {
           const tbl = (after || anchor).insertTable(b.rows.length, b.rows[0].length, 'After', b.rows);
           if (styles && have[b.style]) tbl.style = b.style;
@@ -530,6 +535,7 @@ async function buildLetter() {
         }
         const para = after || anchor.insertParagraph('', 'After');
         after = null;
+        if (brk) { para.insertBreak(Word.BreakType.page, 'Before'); brk = false; }
         if (b.style && known(b.style)) para.style = b.style;
         else if (b.builtIn) para.styleBuiltIn = b.builtIn;
         else { para.styleBuiltIn = 'Normal'; if (b.style && missing.indexOf(b.style) < 0) missing.push(b.style); }
