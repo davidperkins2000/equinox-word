@@ -54,7 +54,7 @@ button.busy::after { content: " …"; }
 #matter div { margin: 2px 0; }
 #matter .fatal b { color: var(--bad); }
 #matter .links { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px 12px; }
-#matter img { display: block; max-width: 100%; max-height: 180px; margin-top: 8px; border-radius: 4px; }
+#matter img { display: block; max-width: 100%; max-height: 180px; margin: 8px auto 0; border-radius: 4px; }
 
 .act { border-top: 1px solid var(--line); padding: 10px 0; }
 .act > button { margin: 0 8px 6px 0; }

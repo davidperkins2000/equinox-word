@@ -11,7 +11,7 @@
  * path tells the web app which matter it is. Nothing is deleted or overwritten in Equinox or Drive.
  */
 'use strict';
-const PANE_VERSION = 'w0.9.7';
+const PANE_VERSION = 'w0.9.8';
 
 const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto', pending: 'eqxw.pending', drive: 'eqxw.drive' };
 const store = {
@@ -168,6 +168,14 @@ async function select(code) {
 }
 
 function renderMatter(out) {
+  // the matter panel as the Gmail and Drive sidebars show it (the script's matterPanel_): the code, its lines, the
+  // picture centred below; links open in the browser
+  if (out.panel && out.panel.lines) {
+    const pic = out.image && /^data:image\//.test(out.image) ? '<img class="pic" alt="" src="' + esc(out.image) + '">' : '';
+    $('matter').innerHTML = '<div class="code">' + esc(out.panel.code || out.code) + '</div>' +
+      out.panel.lines.map(function (l) { return '<div>' + String(l).replace(/<a href=/g, '<a data-href=') + '</div>'; }).join('') + pic;
+    return;
+  }
   const f = out.facts || {}, l = out.links || {};
   const h = [];
   h.push('<div class="code">' + esc(out.code) + '</div>');
