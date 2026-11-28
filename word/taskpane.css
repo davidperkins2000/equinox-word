@@ -89,3 +89,9 @@ label.field select { flex: 1; min-width: 0; }
 
 .tabrow { display: flex; align-items: center; gap: 6px; }
 .tabrow #tabIn { flex: 1; min-width: 0; }
+
+/* File to Equinox: the related matters (5.5.1) */
+.fileto { margin: 6px 0; font-size: 12px; }
+.fileto .grp { margin: 6px 0 2px; color: var(--muted); font-weight: 600; }
+.fileto label.check { display: flex; margin: 2px 0; }
+.fileto .muted { font-size: 11px; }

@@ -11,7 +11,7 @@
  * path tells the web app which matter it is. Nothing is deleted or overwritten in Equinox or Drive.
  */
 'use strict';
-const PANE_VERSION = 'w0.9.9';
+const PANE_VERSION = 'w0.10.0';
 
 const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto', pending: 'eqxw.pending', drive: 'eqxw.drive' };
 const store = {
@@ -156,7 +156,7 @@ async function select(code) {
   ['fileOut', 'sumOut', 'coOut'].forEach(function (id) { $(id).innerHTML = ''; });
   $('docs').hidden = true;
   const others = state.codes.filter(function (c) { return c !== code; });
-  $('fileAllWrap').hidden = !others.length; $('fileAll').checked = false; $('fileAllN').textContent = others.join(', ');
+  loadFileTo(code, others).catch(function () { $('fileTo').hidden = true; });
   $('matter').hidden = false; $('matter').innerHTML = '<span class="muted">Loading ' + esc(code) + '…</span>';
   try {
     const out = await call('matter', { code: code, image: val(KEY.img) === '1' });
@@ -239,11 +239,39 @@ function toBase64(parts) {
   return btoa(bin);
 }
 
+// The related matters to also file to (the script's one list, 5.5.1): only this matter ticked to start with;
+// Whole family ticks every open family member. found: other codes in the document, listed last.
+async function loadFileTo(code, found) {
+  const box = $('fileTo');
+  box.hidden = true; box.innerHTML = '';
+  const r = await call('related', { code: code, found: found });
+  if (state.code !== code) return;
+  const rows = [];
+  r.groups.forEach(function (g) {
+    const items = g.items.filter(function (it) { return !it.own; });
+    if (!items.length) return;
+    rows.push('<div class="grp">' + esc(g.kind === 'Found' ? 'In this document' : g.kind + (g.type ? ' — ' + g.type : '')) + '</div>');
+    items.forEach(function (it) {
+      rows.push('<label class="check"><input type="checkbox" data-code="' + esc(it.code) + '"> ' + esc(it.code) +
+        ' <span class="muted">' + esc([it.title, it.status].filter(Boolean).join(' · ')) + '</span></label>');
+    });
+  });
+  if (!rows.length) return;
+  const fam = r.family.filter(function (c) { return c !== code; });
+  box.innerHTML = '<div class="muted">Also file to:' + (fam.length ? ' <button id="wholeFam" class="small">Whole family (' + (fam.length + 1) + ')</button>' : '') + '</div>' + rows.join('');
+  box.hidden = false;
+  if (fam.length) $('wholeFam').onclick = function () {
+    const all = fam.every(function (c) { const x = box.querySelector('input[data-code="' + c + '"]'); return x && x.checked; });
+    fam.forEach(function (c) { const x = box.querySelector('input[data-code="' + c + '"]'); if (x) x.checked = !all; });
+  };
+}
+
 async function fileToEquinox() {
   const out = $('fileOut');
   state.doc = docInfo();
   if (!state.doc.name) { out.innerHTML = '<div class="bad">Save the document in the matter\'s Drive folder first, so it has a name.</div>'; return; }
-  const codes = [state.code].concat($('fileAll').checked ? state.codes.filter(function (c) { return c !== state.code; }) : []);
+  const ticked = Array.prototype.map.call(document.querySelectorAll('#fileTo input[data-code]:checked'), function (x) { return x.getAttribute('data-code'); });
+  const codes = [state.code].concat(ticked.filter(function (c) { return c !== state.code; }));
   out.innerHTML = '<div class="muted">Reading the document…</div>';
   await busy($('fileBtn'), async function () {
     try {
@@ -253,7 +281,8 @@ async function fileToEquinox() {
       out.innerHTML = (r.results || []).map(function (x) {
         const good = x.outcome === 'filed';
         return '<div class="' + (good ? 'good' : '') + '">' + esc(x.code) + ': ' + esc(x.outcome) + (x.docId ? ' (Equinox document ' + esc(x.docId) + ')' : '') + '</div>';
-      }).join('') + (r.inDrive ? '' : '<div class="muted">Not matched to a Drive file, so it was filed by name and contents.</div>');
+      }).join('') + (r.copies ? '<div class="muted">Each copy\'s notes: ' + esc(r.copies) + '</div>' : '') +
+        (r.inDrive ? '' : '<div class="muted">Not matched to a Drive file, so it was filed by name and contents.</div>');
     } catch (e) { out.innerHTML = '<div class="bad">' + esc(e.message) + '</div>'; }
   });
 }
