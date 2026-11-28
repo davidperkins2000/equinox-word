@@ -11,9 +11,9 @@
  * path tells the web app which matter it is. Nothing is deleted or overwritten in Equinox or Drive.
  */
 'use strict';
-const PANE_VERSION = 'w0.9.5';
+const PANE_VERSION = 'w0.9.6';
 
-const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto', pending: 'eqxw.pending' };
+const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto', pending: 'eqxw.pending', drive: 'eqxw.drive' };
 const store = {
   get: function (k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } },
   set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage blocked: kept for this session only */ } mem[k] = v; }
@@ -100,6 +100,7 @@ async function saveSettings() {
 // ---------- finding the matter ----------
 async function start() {
   state.doc = docInfo();
+  learnDriveRoot(state.doc.path);
   $('docLine').textContent = state.doc.name ? state.doc.name : 'This document isn\'t saved yet. Save it in the matter\'s Drive folder, or type a matter below.';
   if (!val(KEY.url) || !val(KEY.token)) { openSettings('Welcome. Type the web app address and token to connect.'); return; }
   if (!state.doc.name) {
@@ -351,24 +352,52 @@ function setDocFileName(s) {
 function showFileName(name) {
   const old = $('fileNameLine'); if (old) old.remove();
   if (!name) return;
-  $('docLine').insertAdjacentHTML('afterend', '<div id="fileNameLine" class="doc"><div class="muted">File name</div><b>' + esc(name) + '.docx</b>' +
-    '<div class="row"><button id="saveAsBtn" class="primary">Save as…</button><button id="copyNameBtn">Copy name</button></div><div id="fileNameMsg" class="msg"></div></div>');
-  $('saveAsBtn').onclick = function () { saveWithName(name); };
+  const saved = docSaved();
+  $('docLine').insertAdjacentHTML('afterend', '<div id="fileNameLine" class="doc"><div class="muted">File name</div><b id="fileNameNow">' + esc(saved.name || name + '.docx') + '</b>' +
+    '<div class="row wrap"><button id="saveDocBtn" class="primary">Save</button><button id="openDocBtn"' + (saved.id ? '' : ' disabled') + '>Open</button>' +
+    '<button id="savePdfBtn2">Save PDF</button><button id="copyNameBtn" class="small">Copy name</button></div><div id="fileNameMsg" class="msg"></div></div>');
+  $('saveDocBtn').onclick = function () { saveToMatter(name); };
+  $('openDocBtn').onclick = openSaved;
+  $('savePdfBtn2').onclick = function () { busy($('savePdfBtn2'), async function () { try { const r = await savePdf(false); say($('fileNameMsg'), (r.saved ? 'PDF saved in the matter\'s Drive folder: ' : 'That PDF is already in the matter\'s Drive folder: ') + r.name, 'good'); } catch (e) { say($('fileNameMsg'), e.message, 'bad'); } }); };
   $('copyNameBtn').onclick = function () { copyText(name, $('fileNameMsg')); };
 }
-// Word's Save dialog with the name filled in; choose the matter's Drive folder there
-async function saveWithName(name) {
+// Save: the document as Word has it now, saved by the script in the matter's Drive folder under the letter's file
+// name; saving again replaces that same file (its ID is kept with the document)
+function docSaved() { try { return JSON.parse(Office.context.document.settings.get('Equinox.saved') || '{}') || {}; } catch (e) { return {}; } }
+function setDocSaved(o) { try { const st = Office.context.document.settings; st.set('Equinox.saved', JSON.stringify(o)); st.saveAsync(function () {}); } catch (e) { /* not kept */ } }
+async function saveToMatter(name) {
   const msg = $('fileNameMsg');
-  await busy($('saveAsBtn'), async function () {
+  await busy($('saveDocBtn'), async function () {
     try {
-      await Word.run(async function (ctx) { ctx.document.save('Prompt', name); await ctx.sync(); });
-      state.doc = docInfo();
-      if (state.doc.name) { $('fileNameLine').remove(); $('docLine').textContent = state.doc.name; }
-      else say(msg, 'Saved. Choose the matter\'s Drive folder if Word didn\'t ask.', 'good');
-    } catch (e) {
-      copyText(name, msg, 'This version of Word can\'t name the file from the add-in, so the name is copied: choose File → Save As and paste it.');
-    }
+      if (!state.code) throw new Error('Choose the matter first.');
+      say(msg, 'Saving to the matter\'s Drive folder…');
+      const b64 = await documentBase64(), was = docSaved();
+      const r = await call('saveDoc', { code: state.code, name: name, base64: b64, fileId: was.id || '' });
+      setDocSaved({ id: r.fileId, name: r.name, url: r.url, folderUrl: r.folderUrl, drivePath: r.drivePath, mine: !!r.mine });
+      markDocMatter(state.code);
+      $('fileNameNow').textContent = r.name; $('openDocBtn').disabled = false;
+      say(msg, (r.saved === 'updated' ? 'Saved again: ' : 'Saved in the matter\'s Drive folder as ') + r.name + '. To keep working in the saved file, choose Open, then close this window without saving.', 'good');
+    } catch (e) { say(msg, e.message, 'bad'); }
   });
+}
+// Open: the saved file from the Google Drive folder on this Mac (it opens in Word); else the matter's folder in Drive
+function openSaved() {
+  const msg = $('fileNameMsg'), d = docSaved();
+  if (!d.id) { say(msg, 'Save it first.', 'bad'); return; }
+  const root = val(KEY.drive), local = root && d.drivePath ? root + (d.mine ? 'My Drive/' : 'Shared drives/') + d.drivePath : '';
+  if (local) {
+    openLink('file://' + local.split('/').map(encodeURIComponent).join('/'));
+    say(msg, 'Opening ' + d.name + ' from the Drive folder (Google Drive may take a minute to sync). Then close this window without saving. If it doesn\'t open, find it at ' + local, 'good');
+  } else {
+    openLink(d.folderUrl || d.url);
+    say(msg, 'Opened the matter\'s folder in Drive. Open the pane once from any document in Google Drive and Open will go straight to the file on this Mac.', 'good');
+  }
+}
+// The Google Drive folder on this Mac (…/CloudStorage/GoogleDrive-name@example.com/), from the path of any
+// document opened from it
+function learnDriveRoot(path) {
+  const m = /^(\/.*?\/CloudStorage\/GoogleDrive-[^\/]+\/)/.exec(String(path || ''));
+  if (m && val(KEY.drive) !== m[1]) store.set(KEY.drive, m[1]);
 }
 function copyText(text, msg, note) {
   const done = function () { say(msg, note || 'Copied. Paste it into Save As.', 'good'); };
@@ -462,7 +491,7 @@ async function newLetter() {
         base64 = r.base64;
       }
       await Word.run(async function (ctx) { ctx.application.createDocument(base64).open(); await ctx.sync(); });
-      out.innerHTML = '<div class="good">Opened in a new window.</div>' + (fileName ? '<div class="muted">File name: <b>' + esc(fileName) + '.docx</b> (Save as… in that window offers it)</div>' : '') + '<div class="muted">The Equinox pane there writes the letter. If it doesn\'t open by itself, choose Equinox → Fill fields in that window.</div>';
+      out.innerHTML = '<div class="good">Opened in a new window.</div>' + (fileName ? '<div class="muted">File name: <b>' + esc(fileName) + '.docx</b> (Save in that window saves it in the matter\'s Drive folder)</div>' : '') + '<div class="muted">The Equinox pane there writes the letter. If it doesn\'t open by itself, choose Equinox → Fill fields in that window.</div>';
     } catch (e) { out.innerHTML = '<div class="bad">' + esc(e.message) + '</div>'; }
   });
 }
@@ -711,7 +740,7 @@ async function savePdf(quiet) {
   state.doc = docInfo();
   if (!quiet) out.innerHTML = '<div class="muted">Making the PDF…</div>';
   const b64 = await documentPdfBase64();
-  const r = await call('savePdf', { code: state.code, name: state.doc.name, base64: b64 });
+  const r = await call('savePdf', { code: state.code, name: state.doc.name || docSaved().name || docFileName(), base64: b64 });
   markDocMatter(state.code);
   state.pdf = r;
   out.innerHTML = '<div class="good">' + (r.saved ? 'Saved ' : 'Already in the Drive folder: ') + '<b>' + esc(r.name) + '</b></div>' +
