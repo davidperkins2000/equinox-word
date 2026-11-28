@@ -11,7 +11,7 @@
  * path tells the web app which matter it is. Nothing is deleted or overwritten in Equinox or Drive.
  */
 'use strict';
-const PANE_VERSION = 'w0.9.6';
+const PANE_VERSION = 'w0.9.7';
 
 const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto', pending: 'eqxw.pending', drive: 'eqxw.drive' };
 const store = {
@@ -111,6 +111,8 @@ async function start() {
       if (p) { state.recipient = p.recipient || ''; state.recipientChosen = !!p.recipient; state.emailTpl = p.email || ''; if (p.subject) setDocSubject(p.subject); if (!state.intent) state.intent = p.html ? 'build' : 'fill'; }
       $('docLine').textContent = p ? 'New letter for ' + code + '. Save it in the matter\'s Drive folder when you\'re ready.' : 'Unsaved document for ' + code + '.';
       if (p && p.fileName) setDocFileName(p.fileName);
+      if (p && p.tpl) setDocSetting('Equinox.template', p.tpl);
+      if (p && p.taboff && !p.tab) setDocSetting('Equinox.taboff', p.taboff);
       showFileName(docFileName());
       showMatches({ codes: [code], matters: [{ code: code, title: '' }], how: 'typed' });
     }
@@ -436,6 +438,7 @@ async function loadLetter(code) {
   state.stdSubject = r.subject || '';
   $('subjIn').value = docSubject() || state.stdSubject;
   showWarnings(r.warnings);
+  readTab().catch(function () {});
   return r;
 }
 // To / Cc / Bcc for Email PDF: what is chosen, as chips, and a dropdown of every contact on the matter with an email
@@ -480,7 +483,7 @@ async function newLetter() {
         // the finished document, made by the script as Studio's Open in Word makes it (pictures placed, tables, page
         // breaks), so the new window only fills any codes left in the letterhead; else (an older script) the master,
         // and the pane there writes the letter in
-        store.set(KEY.pending, JSON.stringify({ code: state.code, recipient: r.recipient, tpl: id, name: r.name, fileName: r.fileName || '', email: r.email || '', subject: r.subject || '', html: r.docx ? '' : r.html,
+        store.set(KEY.pending, JSON.stringify({ code: state.code, recipient: r.recipient, tpl: id, name: r.name, fileName: r.fileName || '', tab: r.tab || '', taboff: r.taboff || '', email: r.email || '', subject: r.subject || '', html: r.docx ? '' : r.html,
           images: r.docx ? {} : r.images || {}, warnings: r.warnings || [], at: Date.now() }));
         base64 = r.docx || r.master; fileName = r.fileName || '';
         if (r.docx) showWarnings(r.warnings);
@@ -717,6 +720,99 @@ async function fillFields(after) {
   });
 }
 
+// ---------- the letter tab (as Studio's) ----------
+// The gold tab above Dear …: found by its content control (tag eqx-letter-tab, title its words), or in a letter made
+// before w0.9.7 by its shape's name "Letter tab". Turning it off removes it (its words are kept for turning it on
+// again); changing the words redraws it to fit (letterTab makes it as letterDocx_ does). For a new letter not yet
+// saved, the file name and the email subject follow the tab.
+function docSetting(k) { try { return Office.context.document.settings.get(k) || ''; } catch (e) { return ''; } }
+function setDocSetting(k, v) {
+  try { const st = Office.context.document.settings; if ((st.get(k) || '') === v) return; if (v) st.set(k, v); else st.remove(k); st.saveAsync(function () {}); } catch (e) { /* not kept */ }
+}
+const TAB_TAG = 'eqx-letter-tab';
+// where the tab is: { cc } (content control) or { para } (an older letter's paragraph), with its words
+async function findTab(ctx) {
+  const ccs = ctx.document.contentControls.getByTag(TAB_TAG); ccs.load('items/title');
+  await ctx.sync();
+  if (ccs.items.length) return { cc: ccs.items[0], words: ccs.items[0].title || '' };
+  const paras = ctx.document.body.paragraphs; paras.load('items/text,items/style');
+  await ctx.sync();
+  const looks = [];
+  for (let i = 0; i < paras.items.length && i < 80; i++) {
+    const p = paras.items[i];
+    if (/^Dear\b/.test(p.text.trim()) || p.style === 'Letter Salutation') break;
+    if (p.text.trim().length <= 60) looks.push({ para: p, ox: p.getOoxml() });   // the tab's own words may count as its text
+  }
+  if (!looks.length) return null;
+  await ctx.sync();
+  for (const l of looks) {
+    const x = l.ox.value || '';
+    if (/name="Letter tab"/.test(x)) {
+      const m = /<w:txbxContent>[\s\S]*?<w:t[^>]*>([^<]*)<\/w:t>/.exec(x);
+      return { para: l.para, words: m ? m[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"') : '' };
+    }
+  }
+  return null;
+}
+async function readTab() {
+  if (!canCreate()) { $('tabOn').disabled = $('tabIn').disabled = true; return; }
+  const t = await Word.run(async function (ctx) { const f = await findTab(ctx); return f ? { on: true, words: f.words } : null; });
+  state.tab = t || { on: false, words: docSetting('Equinox.taboff') };
+  $('tabOn').checked = state.tab.on; $('tabIn').value = state.tab.words || '';
+  say($('tabMsg'), '');
+}
+async function applyTab() {
+  const msg = $('tabMsg'), words = $('tabIn').value.replace(/\s+/g, ' ').trim();
+  let on = $('tabOn').checked;
+  if (on && !words) { say(msg, 'Type the tab\'s words first.', 'bad'); $('tabOn').checked = false; on = false; }
+  const was = state.tab || { on: false, words: '' };
+  if (on === was.on && (!on || words === was.words)) { if (!on) setDocSetting('Equinox.taboff', words); return; }
+  say(msg, on ? 'Putting in the tab…' : 'Taking out the tab…');
+  try {
+    const r = await call('letterTab', { words: on ? words : '', code: state.code, id: docSetting('Equinox.template'), recipient: state.recipient });
+    const done = await Word.run(async function (ctx) {
+      const f = await findTab(ctx);
+      let anchor = null;
+      if (f) {
+        const range = f.cc ? f.cc.getRange('Whole') : f.para.getRange('Whole');
+        anchor = range.paragraphs.getLast().getNextOrNullObject();
+      } else {
+        const paras = ctx.document.body.paragraphs; paras.load('items/text,items/style');
+        await ctx.sync();
+        anchor = paras.items.filter(function (p) { return p.style === 'Letter Salutation' || /^Dear\b/.test(p.text.trim()); })[0] || null;
+        if (!anchor && on) return 'There\'s no "Dear …" line to put the tab above.';
+      }
+      if (anchor) anchor.load('isNullObject');
+      await ctx.sync();
+      if (f) { if (f.cc) f.cc.delete(false); else f.para.delete(); }
+      if (on && anchor && !anchor.isNullObject) {
+        const np = anchor.insertParagraph('', 'Before');
+        np.insertOoxml(r.ooxml, 'Replace');
+        await ctx.sync();
+        // insertOoxml can leave an empty line after the tab
+        const prev = anchor.getPreviousOrNullObject(); prev.load('isNullObject,text');
+        const inTab = prev.parentContentControlOrNullObject; inTab.load('isNullObject');
+        await ctx.sync();
+        if (!prev.isNullObject && !prev.text.trim() && inTab.isNullObject) {
+          const ox = prev.getOoxml(); await ctx.sync();
+          if (!/Letter tab/.test(ox.value || '')) prev.delete();
+        }
+      }
+      await ctx.sync();
+      return '';
+    });
+    if (done) { say(msg, done, 'bad'); return; }
+    state.tab = { on: on, words: words };
+    setDocSetting('Equinox.taboff', on ? '' : words);
+    // a new letter not yet saved: its file name and subject follow the tab
+    if (!state.doc.name && !docSaved().id && r.fileName) { setDocFileName(r.fileName); showFileName(r.fileName); }
+    if (r.subject !== undefined && (!docSubject() || docSubject() === state.stdSubject)) {
+      state.stdSubject = r.subject; setDocSubject(r.subject); $('subjIn').value = r.subject;
+    }
+    say(msg, on ? 'Tab: ' + words : 'Tab off.', 'good');
+  } catch (e) { say(msg, e.message, 'bad'); }
+}
+
 // ---------- 13.9 PDF to Drive and Gmail ----------
 function documentPdfBase64() {
   return new Promise(function (resolve, reject) {
@@ -795,6 +891,8 @@ function wire() {
   $('fillBtn').onclick = function () { fillFields(); };
   $('pdfBtn').onclick = savePdfClick;
   $('emailBtn').onclick = emailPdf;
+  $('tabOn').onchange = applyTab;
+  $('tabIn').onchange = function () { if ($('tabOn').checked || !this.value.trim()) applyTab(); else setDocSetting('Equinox.taboff', this.value.trim()); };
   $('subjIn').oninput = function () { const v = this.value.trim(); setDocSubject(v && v !== state.stdSubject ? v : ''); };
   $('subjIn').onchange = function () { if (!this.value.trim()) this.value = state.stdSubject || ''; };
   $('mailTo').onchange = function (e) {

@@ -86,3 +86,6 @@ label.field select { flex: 1; min-width: 0; }
 .mailto .chip { padding: 2px 4px 2px 8px; border-radius: 12px; border: 1px solid var(--line); background: var(--soft); }
 .mailto .chip button { border: none; background: none; padding: 0 3px; color: var(--muted); }
 .mailto select { width: auto; max-width: 100%; font-size: 12px; padding: 2px 4px; }
+
+.tabrow { display: flex; align-items: center; gap: 6px; }
+.tabrow #tabIn { flex: 1; min-width: 0; }

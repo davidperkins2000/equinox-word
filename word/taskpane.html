@@ -63,6 +63,9 @@
         <label class="field">To <select id="recipSel"></select></label>
         <div id="mailTo" class="mailto"></div>
         <label class="field">Subject <input id="subjIn" type="text" title="The Gmail draft's subject: the letter template's, else the matter subject line. Clear it to go back."></label>
+        <div class="field tabrow" title="The gold tab above Dear …, as in Studio. Its words also go first in the email subject and in a new letter's file name.">Letter tab
+          <label class="check"><input id="tabOn" type="checkbox"> On</label><input id="tabIn" type="text" maxlength="60" placeholder="e.g. Filing report"></div>
+        <div id="tabMsg" class="msg"></div>
         <div id="letterWarn" class="out"></div>
         <div class="row wrap"><button id="fillBtn">Fill fields</button><button id="pdfBtn">Save PDF</button><button id="emailBtn">Email PDF</button></div>
         <div id="letterOut" class="out"></div>
