@@ -11,7 +11,7 @@
  * path tells the web app which matter it is. Nothing is deleted or overwritten in Equinox or Drive.
  */
 'use strict';
-const PANE_VERSION = 'w0.9.8';
+const PANE_VERSION = 'w0.9.9';
 
 const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto', pending: 'eqxw.pending', drive: 'eqxw.drive' };
 const store = {
@@ -314,11 +314,12 @@ async function checkout(id) {
   try {
     const r = await call('checkout', { code: state.code, docId: d.id });
     const local = localPath(r);
-    const h = ['<div class="good">' + (r.saved ? 'Saved to the Drive folder as ' : 'Already in the Drive folder: ') + '<b>' + esc(r.name) + '</b></div>'];
-    h.push('<div>Open it from Finder' + (local ? ':<br><code>' + esc(local) + '</code>' : ' in the matter\'s folder') +
+    const h = r.exists ? ['<div class="bad">Not saved to Drive: a different file named <b>' + esc(r.name) + '</b> is already in the matter folder.</div>']
+      : ['<div class="good">' + (r.saved ? 'Saved to the Drive folder as ' : 'Already in the Drive folder: ') + '<b>' + esc(r.name) + '</b></div>'];
+    if (!r.exists) h.push('<div>Open it from Finder' + (local ? ':<br><code>' + esc(local) + '</code>' : ' in the matter\'s folder') +
       ' (Google Drive may take a minute to sync), so your edits stay in the Drive folder. <a data-href="' + esc(r.url) + '">View in Drive</a></div>');
     if (r.base64 && canCreate()) { h.push('<button id="openCopy" class="small">Open a copy now</button> <span class="muted">(unsaved, for reading)</span>'); state.copy = r.base64; }
-    else if (r.note) h.push('<div class="muted">' + esc(r.note) + '</div>');
+    else if (r.note && !r.exists) h.push('<div class="muted">' + esc(r.note) + '</div>');
     out.innerHTML = h.join('');
   } catch (e) { out.innerHTML = '<div class="bad">' + esc(e.message) + '</div>'; }
 }
@@ -386,7 +387,7 @@ async function saveToMatter(name) {
       setDocSaved({ id: r.fileId, name: r.name, url: r.url, folderUrl: r.folderUrl, drivePath: r.drivePath, mine: !!r.mine });
       markDocMatter(state.code);
       $('fileNameNow').textContent = r.name; $('openDocBtn').disabled = false;
-      say(msg, (r.saved === 'updated' ? 'Saved again: ' : 'Saved in the matter\'s Drive folder as ') + r.name + '. To keep working in the saved file, choose Open, then close this window without saving.', 'good');
+      say(msg, (r.saved === 'updated' ? 'Saved again: ' : r.saved === 'same' ? 'Already in the matter\'s Drive folder: ' : 'Saved in the matter\'s Drive folder as ') + r.name + '. To keep working in the saved file, choose Open, then close this window without saving.', 'good');
     } catch (e) { say(msg, e.message, 'bad'); }
   });
 }
