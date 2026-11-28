@@ -11,7 +11,7 @@
  * path tells the web app which matter it is. Nothing is deleted or overwritten in Equinox or Drive.
  */
 'use strict';
-const PANE_VERSION = 'w0.9.3';
+const PANE_VERSION = 'w0.9.4';
 
 const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto', pending: 'eqxw.pending' };
 const store = {
@@ -406,9 +406,13 @@ async function newLetter() {
       let base64;
       if (t.kind === 'parts') {   // master + header + content + sign-off, filled by the script
         const r = await call('letterBuild', { code: state.code, recipient: state.recipientChosen ? state.recipient : '', id: id });
-        store.set(KEY.pending, JSON.stringify({ code: state.code, recipient: r.recipient, tpl: id, name: r.name, email: r.email || '', subject: r.subject || '', html: r.html,
-          images: r.images || {}, warnings: r.warnings || [], at: Date.now() }));
-        base64 = r.master;
+        // the finished document, made by the script as Studio's Open in Word makes it (pictures placed, tables, page
+        // breaks), so the new window only fills any codes left in the letterhead; else (an older script) the master,
+        // and the pane there writes the letter in
+        store.set(KEY.pending, JSON.stringify({ code: state.code, recipient: r.recipient, tpl: id, name: r.name, email: r.email || '', subject: r.subject || '', html: r.docx ? '' : r.html,
+          images: r.docx ? {} : r.images || {}, warnings: r.warnings || [], at: Date.now() }));
+        base64 = r.docx || r.master;
+        if (r.docx) showWarnings(r.warnings);
         if ((r.missing || []).length) out.insertAdjacentHTML('beforeend', '<div class="bad">Not found or not known: ' + esc(r.missing.join(', ')) + '</div>');
       } else {                    // a whole-document template: opened, then its codes filled
         const r = await call('template', { id: id });
