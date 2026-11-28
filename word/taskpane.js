@@ -11,7 +11,7 @@
  * path tells the web app which matter it is. Nothing is deleted or overwritten in Equinox or Drive.
  */
 'use strict';
-const PANE_VERSION = 'w0.9.4';
+const PANE_VERSION = 'w0.9.5';
 
 const KEY = { url: 'eqxw.url', token: 'eqxw.token', img: 'eqxw.img', auto: 'eqxw.auto', pending: 'eqxw.pending' };
 const store = {
@@ -109,6 +109,8 @@ async function start() {
     if (code) {
       if (p) { state.recipient = p.recipient || ''; state.recipientChosen = !!p.recipient; state.emailTpl = p.email || ''; if (p.subject) setDocSubject(p.subject); if (!state.intent) state.intent = p.html ? 'build' : 'fill'; }
       $('docLine').textContent = p ? 'New letter for ' + code + '. Save it in the matter\'s Drive folder when you\'re ready.' : 'Unsaved document for ' + code + '.';
+      if (p && p.fileName) setDocFileName(p.fileName);
+      showFileName(docFileName());
       showMatches({ codes: [code], matters: [{ code: code, title: '' }], how: 'typed' });
     }
     return;
@@ -340,6 +342,46 @@ function docSubject() { try { return Office.context.document.settings.get('Equin
 function setDocSubject(s) {
   try { const st = Office.context.document.settings; if ((st.get('Equinox.subject') || '') === s) return; if (s) st.set('Equinox.subject', s); else st.remove('Equinox.subject'); st.saveAsync(function () {}); } catch (e) { /* not kept */ }
 }
+// the file name Studio would give the letter (letterBuild's fileName: the template's File names part filled for the
+// matter), kept with the document until it's saved, and offered as the name when it is
+function docFileName() { try { return Office.context.document.settings.get('Equinox.fileName') || ''; } catch (e) { return ''; } }
+function setDocFileName(s) {
+  try { const st = Office.context.document.settings; if ((st.get('Equinox.fileName') || '') === s) return; st.set('Equinox.fileName', s); st.saveAsync(function () {}); } catch (e) { /* not kept */ }
+}
+function showFileName(name) {
+  const old = $('fileNameLine'); if (old) old.remove();
+  if (!name) return;
+  $('docLine').insertAdjacentHTML('afterend', '<div id="fileNameLine" class="doc"><div class="muted">File name</div><b>' + esc(name) + '.docx</b>' +
+    '<div class="row"><button id="saveAsBtn" class="primary">Save as…</button><button id="copyNameBtn">Copy name</button></div><div id="fileNameMsg" class="msg"></div></div>');
+  $('saveAsBtn').onclick = function () { saveWithName(name); };
+  $('copyNameBtn').onclick = function () { copyText(name, $('fileNameMsg')); };
+}
+// Word's Save dialog with the name filled in; choose the matter's Drive folder there
+async function saveWithName(name) {
+  const msg = $('fileNameMsg');
+  await busy($('saveAsBtn'), async function () {
+    try {
+      await Word.run(async function (ctx) { ctx.document.save('Prompt', name); await ctx.sync(); });
+      state.doc = docInfo();
+      if (state.doc.name) { $('fileNameLine').remove(); $('docLine').textContent = state.doc.name; }
+      else say(msg, 'Saved. Choose the matter\'s Drive folder if Word didn\'t ask.', 'good');
+    } catch (e) {
+      copyText(name, msg, 'This version of Word can\'t name the file from the add-in, so the name is copied: choose File → Save As and paste it.');
+    }
+  });
+}
+function copyText(text, msg, note) {
+  const done = function () { say(msg, note || 'Copied. Paste it into Save As.', 'good'); };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(done, function () { legacyCopy(text); done(); }); return; }
+  } catch (e) { /* fall through */ }
+  legacyCopy(text); done();
+}
+function legacyCopy(text) {
+  const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select();
+  try { document.execCommand('copy'); } catch (e) { /* nothing more to try */ }
+  t.remove();
+}
 function markDocMatter(code) {
   try { const st = Office.context.document.settings; if (st.get('Equinox.matter') === code) return; st.set('Equinox.matter', code); st.saveAsync(function () {}); } catch (e) { /* not kept */ }
 }
@@ -403,15 +445,15 @@ async function newLetter() {
       if (!id) { out.innerHTML = '<div class="bad">No templates in the "Equinox letter templates" Drive folder yet.</div>'; return; }
       const t = (state.templates || []).filter(function (x) { return x.id === id; })[0] || {};
       out.innerHTML = '<div class="muted">Putting together ' + esc(t.name || 'the letter') + '…</div>';
-      let base64;
+      let base64, fileName = '';
       if (t.kind === 'parts') {   // master + header + content + sign-off, filled by the script
         const r = await call('letterBuild', { code: state.code, recipient: state.recipientChosen ? state.recipient : '', id: id });
         // the finished document, made by the script as Studio's Open in Word makes it (pictures placed, tables, page
         // breaks), so the new window only fills any codes left in the letterhead; else (an older script) the master,
         // and the pane there writes the letter in
-        store.set(KEY.pending, JSON.stringify({ code: state.code, recipient: r.recipient, tpl: id, name: r.name, email: r.email || '', subject: r.subject || '', html: r.docx ? '' : r.html,
+        store.set(KEY.pending, JSON.stringify({ code: state.code, recipient: r.recipient, tpl: id, name: r.name, fileName: r.fileName || '', email: r.email || '', subject: r.subject || '', html: r.docx ? '' : r.html,
           images: r.docx ? {} : r.images || {}, warnings: r.warnings || [], at: Date.now() }));
-        base64 = r.docx || r.master;
+        base64 = r.docx || r.master; fileName = r.fileName || '';
         if (r.docx) showWarnings(r.warnings);
         if ((r.missing || []).length) out.insertAdjacentHTML('beforeend', '<div class="bad">Not found or not known: ' + esc(r.missing.join(', ')) + '</div>');
       } else {                    // a whole-document template: opened, then its codes filled
@@ -420,7 +462,7 @@ async function newLetter() {
         base64 = r.base64;
       }
       await Word.run(async function (ctx) { ctx.application.createDocument(base64).open(); await ctx.sync(); });
-      out.innerHTML = '<div class="good">Opened in a new window.</div><div class="muted">The Equinox pane there writes the letter. If it doesn\'t open by itself, choose Equinox → Fill fields in that window.</div>';
+      out.innerHTML = '<div class="good">Opened in a new window.</div>' + (fileName ? '<div class="muted">File name: <b>' + esc(fileName) + '.docx</b> (Save as… in that window offers it)</div>' : '') + '<div class="muted">The Equinox pane there writes the letter. If it doesn\'t open by itself, choose Equinox → Fill fields in that window.</div>';
     } catch (e) { out.innerHTML = '<div class="bad">' + esc(e.message) + '</div>'; }
   });
 }
